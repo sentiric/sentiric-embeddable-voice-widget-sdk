@@ -12,6 +12,7 @@
 *   JavaScript/TypeScript
 *   WebRTC (for real-time audio streaming)
 *   Bundling tools (e.g., Webpack, Rollup) for SDK distribution.
+* we can use Lit Element + Custom Elements	Shadow DOM ile izolasyon
 
 **API Interactions (As an API Client):**
 *   Consumes APIs provided by `sentiric-api-gateway-service` (for STT/TTS and Agent Service APIs).
