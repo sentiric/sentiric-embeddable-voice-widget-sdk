@@ -1,38 +1,43 @@
-# 🌐 Sentiric Embeddable Voice Widget SDK
+# 🌊 Sentiric Embeddable Voice Widget SDK
 
-[![Status](https://img.shields.io/badge/status-prototype-orange.svg)]()
-[![Language](https://img.shields.io/badge/language-JavaScript_/_TypeScript-blue.svg)]()
+[![Status](https://img.shields.io/badge/status-active-green.svg)]()
+[![Spec](https://img.shields.io/badge/spec-v4.1-blue.svg)]()
 
-Bu repo, web sitelerine kolayca entegre edilebilen, Sentiric'in sesli etkileşim yeteneklerini doğrudan son kullanıcılara sunan bir **JavaScript widget/SDK'sı** geliştirmeyi hedefler.
+Bu SDK, web sitelerine tek satır kod ile eklenebilen, Sentiric AI asistanı ile gerçek zamanlı (Full-Duplex) sesli iletişim kurmayı sağlayan hafif bir istemci kütüphanesidir.
 
-## 🎯 Temel Sorumluluklar
+## 🏛️ Mimari Prensipler (Spec Compliance)
 
-*   **WebRTC Entegrasyonu:** Tarayıcıdan mikrofon ve hoparlör erişimi sağlayarak, sesi `sentiric-sip-gateway-service`'e WebRTC üzerinden gönderir.
-*   **Kullanıcı Arayüzü:** Web sitesine eklenebilen, tıklanabilir bir "Bize Sesle Ulaşın" butonu ve temel bir çağrı arayüzü (örn: kayıt/durdur butonu, durum göstergesi) sağlar.
-*   **Geliştirici API'si:** Widget'ın davranışını (renkler, metinler vb.) özelleştirmek ve `onCallStart`, `onTranscriptReceived` gibi olayları dinlemek için geliştirici dostu bir API sunar.
+*   **WebSocket & Protobuf:** Eski SIP/RTP protokolleri yerine `stream-gateway-service` ile yüksek performanslı, ikili (binary) Protobuf mesajları üzerinden haberleşir.
+*   **Shadow DOM İzolasyonu:** Web Component yapısı sayesinde müşteri sitesinin CSS ve JS kurallarıyla çakışmaz.
+*   **Aptal İstemci (Dumb Client):** Hiçbir AI mantığı veya API anahtarı barındırmaz. Sadece mikrofon/hoparlör ile Gateway arasında köprü kurar.
+*   **SUTS v4.0:** Tüm dahili olaylar ve hatalar standart telemetri formatında raporlanır.
 
-## 🛠️ Teknoloji Yığını
+## 🚀 Hızlı Başlangıç
 
-*   **Dil:** TypeScript
-*   **Protokol:** WebRTC
-*   **UI:** Lit Element veya Preact (hafif ve Shadow DOM ile izolasyon için)
-*   **Paketleyici:** Rollup veya Webpack (SDK dağıtımı için)
+### 1. HTML Entegrasyonu (CDN)
+```html
+<script src="https://cdn.sentiric.com/sdk/v1/voice-widget.js"></script>
 
-## 🔌 API Etkileşimleri
+<sentiric-voice-widget 
+    tenant-id="your-tenant-id"
+    gateway-url="wss://stream.sentiric.ai/ws"
+    language="tr-TR"
+    theme-color="#3b82f6">
+</sentiric-voice-widget>
+```
 
-*   **Protokol İletişimi:** `sentiric-sip-gateway-service` ile WebRTC üzerinden SIP ve RTP/SRTP iletişimi kurar.
-*   **API İstemcisi:** Kimlik doğrulama ve oturum başlatma için `sentiric-api-gateway-service`'i çağırabilir.
+### 2. NPM ile Kullanım
+```bash
+npm install @sentiric/contracts @sentiric/voice-widget-sdk
+```
 
-## 🚀 Yerel Geliştirme
+## 🛠️ Yerel Geliştirme
 
-1.  **Bağımlılıkları Yükleyin:** `npm install`
-2.  **Örnek Sayfayı Başlatın:** `npm run dev`
-
-## 🤝 Katkıda Bulunma
-
-Katkılarınızı bekliyoruz! Lütfen projenin ana [Sentiric Governance](https://github.com/sentiric/sentiric-governance) reposundaki kodlama standartlarına ve katkıda bulunma rehberine göz atın.
+1. `npm install`
+2. `npm run dev` (Örnek test sayfası ile birlikte başlatır)
+3. `npm run build` (UMD ve ESM çıktılarını `dist/` klasörüne yazar)
 
 ---
-## 🏛️ Anayasal Konum
+## 📜 Anayasal Konum
+Bu SDK, [Sentiric Spec](https://github.com/sentiric/sentiric-spec) dokümantasyonundaki `frontend_sdk` kısıtlamalarına tabidir.
 
-Bu servis, [Sentiric Anayasası'nın (v11.0)](https://github.com/sentiric/sentiric-governance/blob/main/docs/blueprint/Architecture-Overview.md) **Zeka & Orkestrasyon Katmanı**'nda yer alan merkezi bir bileşendir.

@@ -1,43 +1,49 @@
-# 🌐 Sentiric Embeddable Voice Widget SDK - Görev Listesi
+# 🌐 Sentiric Voice Widget SDK - Görev Listesi
 
-Bu belge, `embeddable-voice-widget-sdk`'nın geliştirme yol haritasını ve önceliklerini tanımlar.
-
----
-
-### Faz 1: Temel Widget ve Arayüz (Sıradaki Öncelik)
-
-Bu faz, widget'ın görsel olarak var olmasını ve temel kullanıcı etkileşimlerini almasını hedefler.
-
--   [ ] **Görev ID: WIDGET-001 - Proje İskeleti**
-    -   **Açıklama:** TypeScript, Rollup/Webpack ve Lit/Preact kullanarak temel proje yapısını oluştur.
-    -   **Durum:** ⬜ Planlandı.
-
--   [ ] **Görev ID: WIDGET-002 - Temel UI Bileşenleri**
-    -   **Açıklama:** Tıklanabilir bir "Çağrı Başlat" butonu ve çağrı durumunu gösteren basit bir modal/pencere arayüzü tasarla.
-    -   **Durum:** ⬜ Planlandı.
-
--   [ ] **Görev ID: WIDGET-003 - Mikrofon Erişimi**
-    -   **Açıklama:** Tarayıcıdan mikrofon izni isteme ve ses akışını yakalama mantığını implemente et.
-    -   **Durum:** ⬜ Planlandı.
+Bu liste, `stream-gateway-service` ile tam uyumlu, gömülebilir sesli widget'ın geliştirme yol haritasıdır.
 
 ---
 
-### Faz 2: WebRTC Entegrasyonu
+### Faz 1: Core Altyapı ve Bağlantı (ÖNCELİKLİ)
 
-Bu faz, widget'ın platformla gerçek zamanlı sesli iletişim kurmasını sağlamayı hedefler.
-
--   [ ] **Görev ID: WIDGET-004 - SIP over WebSockets**
-    -   **Açıklama:** `sip-gateway`'e WebSocket üzerinden bağlanarak bir SIP oturumu başlatan `JsSIP` veya benzeri bir kütüphaneyi entegre et.
-    -   **Durum:** ⬜ Planlandı.
-
--   [ ] **Görev ID: WIDGET-005 - RTP/SRTP Akışı**
-    -   **Açıklama:** Mikrofon'dan gelen ses verisini WebRTC `RTCPeerConnection` üzerinden `media-service`'e (veya gateway'e) gönder. Gelen ses akışını hoparlörde çal.
-    -   **Durum:** ⬜ Planlandı.
+- [ ] **WIDGET-001: Proje İskeleti**
+    - **Açıklama:** TypeScript, Vite (Library Mode) ve Prettier/Eslint kurulumu.
+    - **Durum:** ⬜ Planlandı.
+- [ ] **WIDGET-002: Protobuf Entegrasyonu**
+    - **Açıklama:** `@sentiric/contracts` npm paketinin dahil edilmesi ve `StreamSessionRequest` mesaj tiplerinin tanımlanması.
+    - **Durum:** ⬜ Planlandı.
+- [ ] **WIDGET-003: Core Stream Client**
+    - **Açıklama:** `SentiricStreamClient` sınıfının yazılması. WebSocket lifecycle yönetimi ve Gateway el sıkışma (SessionConfig) mantığı.
+    - **Durum:** ⬜ Planlandı.
 
 ---
 
-### Faz 3: Geliştirici API'si ve Özelleştirme
+### Faz 2: Ses İşleme ve Pipeline
 
--   [ ] **Görev ID: WIDGET-006 - Geliştirici API'si**
-    -   **Açıklama:** Widget'ı başlatan, olayları dinleyen (`onCallStart`, `onEnd`) ve özelleştiren (`setColor`, `setText`) bir JavaScript API'si oluştur.
-    -   **Durum:** ⬜ Planlandı.
+- [ ] **WIDGET-004: AudioWorklet Kaydedici**
+    - **Açıklama:** Web Audio API kullanarak mikrofondan ham ses (PCM) alma ve Gateway'in beklediği sample rate (örn: 24kHz) dönüşümü.
+    - **Durum:** ⬜ Planlandı.
+- [ ] **WIDGET-005: Playback Jitter Buffer**
+    - **Açıklama:** Gateway'den gelen ses parçalarını pürüzsüz çalmak için kuyruğa alma ve zamanlama mantığı.
+    - **Durum:** ⬜ Planlandı.
+
+---
+
+### Faz 3: UI ve Web Component
+
+- [ ] **WIDGET-006: Shadow DOM Widget Shell**
+    - **Açıklama:** `<sentiric-voice-widget>` custom element iskeleti ve CSS izolasyonu.
+    - **Durum:** ⬜ Planlandı.
+- [ ] **WIDGET-007: Canlı Durum Animasyonları**
+    - **Açıklama:** "Dinliyor", "Düşünüyor", "Konuşuyor" durumları için görsel geri bildirimler.
+    - **Durum:** ⬜ Planlandı.
+
+---
+
+### Faz 4: SDK Yayınlama
+
+- [ ] **WIDGET-008: CDN & NPM Dağıtımı**
+    - **Açıklama:** Rollup/Vite ile tek dosya (minified) build ve sürümleme (v1.0.0).
+    - **Durum:** ⬜ Planlandı.
+
+---
