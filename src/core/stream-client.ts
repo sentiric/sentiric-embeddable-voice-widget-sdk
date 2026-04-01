@@ -1,5 +1,6 @@
 import protobuf from 'protobufjs';
 import { SentiricAudioManager } from './audio-manager';
+import { Logger } from '../utils/logger'; // YENİ
 
 export interface StreamClientOptions {
   gatewayUrl: string;
@@ -30,6 +31,7 @@ export class SentiricStreamClient {
       token: 'guest-token',
       ...options,
     };
+    Logger.setTenant(this.options.tenantId);
   }
 
   /**
@@ -47,7 +49,7 @@ export class SentiricStreamClient {
     await this.connect();
     await this.audioManager.startMicrophone();
     
-    console.log('🚀 Sentiric AI Session Active.');
+    Logger.info("SESSION_ACTIVE", "Sentiric AI Session started successfully.");
   }
 
   private async initProtobuf() {
@@ -99,10 +101,16 @@ export class SentiricStreamClient {
   private async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+
+        Logger.info("WS_CONNECTING", `Connecting to ${this.options.gatewayUrl}`);
+
         this.ws = new WebSocket(this.options.gatewayUrl);
         this.ws.binaryType = 'arraybuffer';
 
         this.ws.onopen = () => {
+          
+          Logger.info("WS_CONNECTED", "WebSocket connection established.");
+
           this.sendSessionConfig();
           this.isReady = true;
           resolve();
@@ -115,6 +123,9 @@ export class SentiricStreamClient {
           this.audioManager?.stop();
         };
       } catch (err) {
+
+        Logger.error("WS_INIT_FAIL", "Failed to initialize WebSocket", { error: err });
+        
         reject(err);
       }
     });
