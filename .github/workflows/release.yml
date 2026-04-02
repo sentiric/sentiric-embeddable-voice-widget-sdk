@@ -26,6 +26,8 @@ jobs:
 
       - name: Build SDK
         run: npm run build
+        env:
+          VITE_GATEWAY_URL: ${{ secrets.VITE_GATEWAY_URL }}
 
       # dist klasöründeki dosyaları CDN olarak kullanmak için gh-pages branchine atar
       - name: Deploy to GitHub Pages (CDN)

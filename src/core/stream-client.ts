@@ -7,6 +7,8 @@ import { Logger } from '../utils/logger';
 export interface StreamClientOptions {
   gatewayUrl: string;
   tenantId: string;
+  traceId?: string;   // Host uygulama verebilir
+  sessionId?: string; // Host uygulama verebilir
   token?: string;
   language?: string;
   sampleRate?: number;
@@ -14,6 +16,13 @@ export interface StreamClientOptions {
   onAudioReceived?: (chunk: Uint8Array) => void;
   onError?: (error: any) => void;
   onClose?: () => void;
+}
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 
 export class SentiricStreamClient {
@@ -25,7 +34,18 @@ export class SentiricStreamClient {
   private RequestType: any = null;
   private ResponseType: any = null;
 
+  // Resilience (Dayanıklılık) State
+  private isIntentionallyStopped: boolean = false;
+  private retryCount: number = 0;
+  private readonly maxRetries: number = 5;
+  
+  public readonly traceId: string;
+  public readonly sessionId: string;
+
   constructor(options: StreamClientOptions) {
+    this.traceId = options.traceId || generateUUID();
+    this.sessionId = options.sessionId || generateUUID();
+    
     this.options = {
       language: 'tr-TR',
       sampleRate: 24000,
@@ -33,28 +53,30 @@ export class SentiricStreamClient {
       token: 'guest-token',
       ...options,
     };
-    Logger.setTenant(this.options.tenantId);
+    
+    // SUTS v4.0 Bağlamını Kur
+    Logger.setContext(this.options.tenantId, this.traceId, this.sessionId);
   }
 
   public async start(): Promise<void> {
+    this.isIntentionallyStopped = false;
+    this.retryCount = 0;
+
     await this.initProtobuf();
     
-    // Mikrofonu ve ses menajerini hazırla
+    // Mikrofon ve VAD Engine'i bir kez başlatıyoruz. Bağlantı kopsa bile mikrofon açık kalır.
     this.audioManager = new SentiricAudioManager(
       (chunk) => this.sendAudio(chunk), 
-      () => this.sendInterruptSignal(), // VAD söz kesmeyi algıladığında tetiklenir
+      () => this.sendInterruptSignal(), 
       this.options.sampleRate
     );
 
-    await this.connect();
+    await this.connect(true); // isInitial = true
     await this.audioManager.startMicrophone();
     
     Logger.info("SESSION_ACTIVE", "Sentiric AI Session started successfully.");
   }
 
-  /**
-   * Dışarıdan ses basmak (Mobil WebView / React Native / Flutter Bridge için)
-   */
   public injectExternalAudio(pcm16Data: Int16Array, rmsOverride?: number) {
     if (this.audioManager) {
       this.audioManager.injectExternalAudio(pcm16Data, rmsOverride);
@@ -85,20 +107,14 @@ export class SentiricStreamClient {
                         language: { id: 2, type: "string" },
                         sampleRate: { id: 3, type: "uint32" },
                         edgeMode: { id: 4, type: "bool" }
+                        // Not: Gelecekte protobuf güncellendiğinde sessionId ve traceId buraya eklenecek.
                       }
                     },
                     SessionControl: {
-                      fields: {
-                        event: { id: 1, type: "EventType" }
-                      },
+                      fields: { event: { id: 1, type: "EventType" } },
                       nested: {
                         EventType: {
-                          values: {
-                            EVENT_TYPE_UNSPECIFIED: 0,
-                            EVENT_TYPE_INTERRUPT: 1,
-                            EVENT_TYPE_EOS: 2,
-                            EVENT_TYPE_HANGUP: 3
-                          }
+                          values: { EVENT_TYPE_UNSPECIFIED: 0, EVENT_TYPE_INTERRUPT: 1, EVENT_TYPE_EOS: 2, EVENT_TYPE_HANGUP: 3 }
                         }
                       }
                     },
@@ -123,38 +139,55 @@ export class SentiricStreamClient {
     this.ResponseType = root.lookupType("sentiric.stream.v1.StreamSessionResponse");
   }
 
-  private async connect(): Promise<void> {
+  /**
+   * Exponential Backoff ile ağ bağlantısını kurar ve korur.
+   */
+  private async connect(isInitial: boolean = false): Promise<void> {
     return new Promise((resolve, reject) => {
-      try {
-        Logger.info("WS_CONNECTING", `Connecting to ${this.options.gatewayUrl}`);
-
+      const attempt = () => {
+        Logger.info("WS_CONNECTING", `Connecting to gateway...`, { attempt: this.retryCount });
         this.ws = new WebSocket(this.options.gatewayUrl);
         this.ws.binaryType = 'arraybuffer';
 
         this.ws.onopen = () => {
           Logger.info("WS_CONNECTED", "WebSocket connection established.");
-          this.sendSessionConfig();
+          this.retryCount = 0; // Bağlantı başarılı, sayacı sıfırla
           this.isReady = true;
+          this.sendSessionConfig(); // Reconnect durumunda session'ı (Resumption) sunucuya hatırlat
           resolve();
         };
 
         this.ws.onmessage = (event) => this.handleMessage(event.data);
-        
+
         this.ws.onerror = (err) => {
-          Logger.error("WS_ERROR", "WebSocket error occurred", { error: err });
-          reject(err);
+          Logger.warn("WS_ERROR", "WebSocket encountered an error.");
         };
         
         this.ws.onclose = () => {
-          Logger.warn("WS_CLOSED", "WebSocket connection closed.");
           this.isReady = false;
-          this.audioManager?.stop();
-          if (this.options.onClose) this.options.onClose();
+          
+          if (this.isIntentionallyStopped) {
+            Logger.info("WS_CLOSED", "Connection closed intentionally.");
+            return;
+          }
+
+          if (this.retryCount < this.maxRetries) {
+            this.retryCount++;
+            // Üstel bekleme (Exponential Backoff): 1s, 2s, 4s, 8s, 16s (Max 30s)
+            const backoffMs = Math.min(30000, 1000 * Math.pow(2, this.retryCount - 1));
+            Logger.warn("WS_RECONNECTING", `Connection lost. Retrying in ${backoffMs}ms...`, { attempt: this.retryCount });
+            setTimeout(attempt, backoffMs);
+          } else {
+            Logger.error("WS_DISCONNECTED_FATAL", "Max reconnection attempts reached. Session dead.");
+            this.audioManager?.stop();
+            if (isInitial) reject(new Error("Failed to connect to gateway after multiple attempts"));
+            if (this.options.onError) this.options.onError(new Error("Connection lost permanently"));
+            if (this.options.onClose) this.options.onClose();
+          }
         };
-      } catch (err) {
-        Logger.error("WS_INIT_FAIL", "Failed to initialize WebSocket", { error: err });
-        reject(err);
-      }
+      };
+
+      attempt();
     });
   }
 
@@ -173,16 +206,9 @@ export class SentiricStreamClient {
     this.ws.send(buffer);
   }
 
-  /**
-   * Sunucuya donanımsal söz kesme (Barge-in) sinyali atar.
-   */
   private sendInterruptSignal() {
     if (!this.isReady || !this.ws || !this.RequestType) return;
-    const controlPayload = {
-      control: {
-        event: 1 // EVENT_TYPE_INTERRUPT
-      }
-    };
+    const controlPayload = { control: { event: 1 } };
     const message = this.RequestType.create(controlPayload);
     const buffer = this.RequestType.encode(message).finish();
     this.ws.send(buffer);
@@ -201,13 +227,12 @@ export class SentiricStreamClient {
     if (!this.ResponseType) return;
     try {
       const message = this.ResponseType.decode(new Uint8Array(data));
-      
       if (message.audioResponse) {
         this.audioManager?.playChunk(message.audioResponse);
         if (this.options.onAudioReceived) this.options.onAudioReceived(message.audioResponse);
       } 
       else if (message.textResponse) {
-        console.log('🤖 AI:', message.textResponse);
+        // AI'dan gelen metinler (Gelecekte UI'a aktarılacak)
       }
     } catch (e) {
       Logger.error("WS_DECODE_ERROR", "Failed to decode incoming Protobuf message", { error: e });
@@ -215,8 +240,10 @@ export class SentiricStreamClient {
   }
 
   public stop() {
+    this.isIntentionallyStopped = true;
+    this.isReady = false;
     this.ws?.close();
     this.audioManager?.stop();
-    this.isReady = false;
+    Logger.info("SESSION_STOPPED", "Client manually stopped the session.");
   }
 }

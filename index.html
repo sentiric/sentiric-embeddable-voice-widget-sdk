@@ -50,7 +50,7 @@
         console.log(`🚀 Sentiric SDK v${__APP_VERSION__} initialized.`);
 
         // Vite'in sağladığı çevre değişkenini kullanarak URL'yi set et
-        const gatewayUrl = import.meta.env.VITE_GATEWAY_URL;
+        const gatewayUrl = import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws";
         const widget = document.getElementById('myWidget');
         
         if (widget) {
