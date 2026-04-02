@@ -1,18 +1,39 @@
 # 🌊 Sentiric Stream SDK
 
-Sentiric `stream-gateway-service` altyapısı için geliştirilmiş resmi JavaScript/TypeScript istemci kütüphanesidir.
+Sentiric `stream-gateway-service` altyapısı için geliştirilmiş evrensel iletişim motoru ve UI kütüphanesidir.
 
-## 🎯 Vizyon
-Bu SDK, Sentiric ekosisteminin tüm "Dijital Giriş Kapıları" için ortak iletişim motorudur. İster bir web sitesine sesli asistan ekleyin, ister bir operatör paneli (Web Agent) geliştirin, ister mobil bir chatbot yapın; `stream-sdk` tüm veri akışını standartlaştırır.
+## 📦 Hızlı Entegrasyon (CDN)
+Web sitenize sesli asistan eklemek için aşağıdaki kodu HTML'inize yapıştırın:
 
-## 🛠️ Yetenekler
-*   **Audio Streaming:** Full-duplex (söz kesilebilir) ses iletişimi.
-*   **Data Streaming:** Gerçek zamanlı metin (transcript) ve sinyal takibi.
-*   **UI Components:** Shadow-DOM ile izole edilmiş hazır bileşenler:
-    *   `<sentiric-voice-widget>`: AI Asistan butonu ve arayüzü.
-
-## 🚦 Hızlı Başlangıç
 ```html
-<script src="https://cdn.sentiric.com/stream-sdk.js"></script>
-<sentiric-voice-widget tenant-id="demo" gateway-url="wss://..."></sentiric-voice-widget>
+<!-- Sentiric Stream SDK -->
+<script src="https://sentiric.github.io/sentiric-stream-sdk/stream-sdk.umd.cjs"></script>
+
+<!-- Asistan Widget -->
+<sentiric-voice-widget 
+    tenant-id="your-id" 
+    gateway-url="wss://stream.sentiric.ai/ws">
+</sentiric-voice-widget>
 ```
+
+---
+
+## 🤖 AI AGENT ORIENTATION (For LLM Orchestrators)
+
+**DİKKAT:** Bu proje bir `TASKS.md` dosyası barındırmaz. Projeyi devralan AI modeli, aşağıdaki "Anayasal Vizyon" ve "Mevcut Durum" verilerine bakarak bir sonraki mantıklı adımı kendisi planlamalıdır.
+
+### 🏛️ Mimari Anayasa (Constitutional Constraints)
+1. **Dumb Client Policy:** SDK asla iş mantığı (AI prompt, routing vb.) barındırmaz. Sadece ses/metin borusudur.
+2. **SUTS v4.0 Mandate:** Tüm loglar `src/utils/logger.ts` üzerinden standart JSON formatında basılmalıdır.
+3. **Protobuf Strictness:** İletişim sadece `sentiric.stream.v1` şeması ile WebSocket üzerinden yapılır.
+4. **Resilience First:** İnternet kopmalarına karşı `Exponential Backoff` mekanizması her zaman korunmalıdır.
+
+### 🎯 Mevcut Yetenekler
+* Full-duplex Audio (PCM 16-bit / AudioWorklet).
+* Text Messaging (Chat support ready).
+* Shadow-DOM isolated UI components.
+* Auto-reconnection engine.
+
+### 🚀 Geliştirme Beklentisi
+Bu repoyu inceleyen AI modeli; **Performans Optimizasyonu, Video Akışı Hazırlığı, UI Özelleştirme Yetenekleri veya Cross-Platform (Mobile) Uyumluluğu** gibi alanlarda eksikleri tespit etmeli ve otonom olarak geliştirme planı sunmalıdır.
+
