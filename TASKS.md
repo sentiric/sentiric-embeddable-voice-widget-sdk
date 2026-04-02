@@ -1,11 +1,14 @@
-# 🌐 Sentiric Voice Widget SDK - Görev Listesi (TAMAMLANDI ✅)
+# 🌐 Sentiric Stream SDK - Yol Haritası
 
-- [x] **WIDGET-001: Proje İskeleti**
-- [x] **WIDGET-002: Protobuf Entegrasyonu**
-- [x] **WIDGET-003: Core Stream Client**
-- [x] **WIDGET-004: AudioWorklet Kaydedici**
-- [x] **WIDGET-005: Playback Jitter Buffer**
-- [x] **WIDGET-006: Shadow DOM Widget Shell**
-- [x] **WIDGET-007: Canlı Durum Animasyonları**
-- [x] **WIDGET-008: Demo Page**
-- [x] **WIDGET-009: SUTS v4.0 Architectural Sealing (Logger)**
+- [x] **PHASE-1: Core Engine**
+    - [x] WebSocket & Protobuf implementation.
+    - [x] Low-latency AudioWorklet processor.
+    - [x] Stream Handshake (SessionConfig).
+- [x] **PHASE-2: UI Components**
+    - [x] `<sentiric-voice-widget>` Shadow DOM integration.
+    - [x] Pulse animations and AI state feedback.
+- [ ] **PHASE-3: Professional Tooling (Sıradaki Öncelik)**
+    - [ ] GitHub Actions for NPM & CDN publishing.
+    - [ ] `web-agent` monitoring mode (Listen-only/Barge-in signals).
+- [ ] **PHASE-4: Chat Support**
+    - [ ] `<sentiric-chat-widget>` implementation.

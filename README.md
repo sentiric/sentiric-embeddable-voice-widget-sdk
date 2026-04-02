@@ -1,43 +1,18 @@
-# 🌊 Sentiric Embeddable Voice Widget SDK
+# 🌊 Sentiric Stream SDK
 
-[![Status](https://img.shields.io/badge/status-active-green.svg)]()
-[![Spec](https://img.shields.io/badge/spec-v4.1-blue.svg)]()
+Sentiric `stream-gateway-service` altyapısı için geliştirilmiş resmi JavaScript/TypeScript istemci kütüphanesidir.
 
-Bu SDK, web sitelerine tek satır kod ile eklenebilen, Sentiric AI asistanı ile gerçek zamanlı (Full-Duplex) sesli iletişim kurmayı sağlayan hafif bir istemci kütüphanesidir.
+## 🎯 Vizyon
+Bu SDK, Sentiric ekosisteminin tüm "Dijital Giriş Kapıları" için ortak iletişim motorudur. İster bir web sitesine sesli asistan ekleyin, ister bir operatör paneli (Web Agent) geliştirin, ister mobil bir chatbot yapın; `stream-sdk` tüm veri akışını standartlaştırır.
 
-## 🏛️ Mimari Prensipler (Spec Compliance)
+## 🛠️ Yetenekler
+*   **Audio Streaming:** Full-duplex (söz kesilebilir) ses iletişimi.
+*   **Data Streaming:** Gerçek zamanlı metin (transcript) ve sinyal takibi.
+*   **UI Components:** Shadow-DOM ile izole edilmiş hazır bileşenler:
+    *   `<sentiric-voice-widget>`: AI Asistan butonu ve arayüzü.
 
-*   **WebSocket & Protobuf:** Eski SIP/RTP protokolleri yerine `stream-gateway-service` ile yüksek performanslı, ikili (binary) Protobuf mesajları üzerinden haberleşir.
-*   **Shadow DOM İzolasyonu:** Web Component yapısı sayesinde müşteri sitesinin CSS ve JS kurallarıyla çakışmaz.
-*   **Aptal İstemci (Dumb Client):** Hiçbir AI mantığı veya API anahtarı barındırmaz. Sadece mikrofon/hoparlör ile Gateway arasında köprü kurar.
-*   **SUTS v4.0:** Tüm dahili olaylar ve hatalar standart telemetri formatında raporlanır.
-
-## 🚀 Hızlı Başlangıç
-
-### 1. HTML Entegrasyonu (CDN)
+## 🚦 Hızlı Başlangıç
 ```html
-<script src="https://cdn.sentiric.com/sdk/v1/voice-widget.js"></script>
-
-<sentiric-voice-widget 
-    tenant-id="your-tenant-id"
-    gateway-url="wss://stream.sentiric.ai/ws"
-    language="tr-TR"
-    theme-color="#3b82f6">
-</sentiric-voice-widget>
+<script src="https://cdn.sentiric.com/stream-sdk.js"></script>
+<sentiric-voice-widget tenant-id="demo" gateway-url="wss://..."></sentiric-voice-widget>
 ```
-
-### 2. NPM ile Kullanım
-```bash
-npm install @sentiric/contracts @sentiric/voice-widget-sdk
-```
-
-## 🛠️ Yerel Geliştirme
-
-1. `npm install`
-2. `npm run dev` (Örnek test sayfası ile birlikte başlatır)
-3. `npm run build` (UMD ve ESM çıktılarını `dist/` klasörüne yazar)
-
----
-## 📜 Anayasal Konum
-Bu SDK, [Sentiric Spec](https://github.com/sentiric/sentiric-spec) dokümantasyonundaki `frontend_sdk` kısıtlamalarına tabidir.
-

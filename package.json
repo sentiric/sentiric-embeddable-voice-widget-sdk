@@ -1,45 +1,31 @@
 {
-  "name": "@sentiric/embeddable-voice-widget-sdk",
+  "name": "@sentiric/stream-sdk",
   "version": "0.1.0",
-  "description": "Sentiric Full-Duplex Voice AI Widget SDK for Web and Mobile Browsers.",
+  "description": "Universal Sentiric Stream SDK. High-performance communication engine for Voice, Chat and AI interactions.",
   "type": "module",
-  "main": "./dist/voice-widget-sdk.umd.cjs",
-  "module": "./dist/voice-widget-sdk.js",
+  "main": "./dist/stream-sdk.umd.cjs",
+  "module": "./dist/stream-sdk.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/voice-widget-sdk.js",
-      "require": "./dist/voice-widget-sdk.umd.cjs"
+      "import": "./dist/stream-sdk.js",
+      "require": "./dist/stream-sdk.umd.cjs"
     }
   },
   "scripts": {
     "dev": "vite",
     "build": "vite build && tsc --emitDeclarationOnly",
-    "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css,md}\""
+    "preview": "vite preview"
   },
-  "keywords": [
-    "sentiric",
-    "voice-ai",
-    "webrtc",
-    "websocket",
-    "protobuf",
-    "ai-agent"
-  ],
   "author": "Sentiric Architecture Team",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "eslint": "^8.56.0",
-    "prettier": "^3.2.4",
-    "terser": "^5.46.1",
+    "terser": "^5.27.0",
     "typescript": "^5.3.3",
     "vite": "^5.1.0",
     "vite-plugin-dts": "^3.7.2"
   },
   "dependencies": {
-    "@sentiric/contracts": "https://github.com/sentiric/sentiric-contracts/tarball/main",
     "protobufjs": "^7.2.5"
   }
 }
