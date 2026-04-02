@@ -5229,19 +5229,27 @@ class SentiricAudioProcessor extends AudioWorkletProcessor {
 
   process(inputs, outputs, parameters) {
     const input = inputs[0];
-    if (input.length > 0) {
-      const channelData = input[0]; // Mono kanal verisi
-      
-      // Float32 -> Int16 Çevrimi (PCM)
+    if (input.length > 0 && input[0].length > 0) {
+      const channelData = input[0]; // Mono kanal
       const pcmData = new Int16Array(channelData.length);
+      let sumSquares = 0;
+
       for (let i = 0; i < channelData.length; i++) {
-        // Sesi normalize et ve sınırla
+        // Clipping koruması
         const s = Math.max(-1, Math.min(1, channelData[i]));
+        // Float32 -> Int16 (PCM)
         pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        // RMS (Kök Ortalama Kare) için enerji toplamı
+        sumSquares += channelData[i] * channelData[i];
       }
 
-      // Ana thread'e işlenmiş paketi gönder
-      this.port.postMessage(pcmData.buffer, [pcmData.buffer]);
+      const rms = Math.sqrt(sumSquares / channelData.length);
+
+      // Ana thread'e işlenmiş paketi ve RMS değerini gönder
+      this.port.postMessage({ 
+        pcmData: pcmData.buffer, 
+        rms: rms 
+      }, [pcmData.buffer]);
     }
     return true;
   }
@@ -5249,82 +5257,6 @@ class SentiricAudioProcessor extends AudioWorkletProcessor {
 
 registerProcessor('sentiric-audio-processor', SentiricAudioProcessor);
 `;
-class SentiricAudioManager {
-  constructor(onAudioData, sampleRate = 24e3) {
-    __publicField(this, "audioContext", null);
-    __publicField(this, "mediaStream", null);
-    __publicField(this, "workletNode", null);
-    __publicField(this, "sourceNode", null);
-    // Playback için zamanlama (Scheduling) değişkenleri
-    __publicField(this, "nextStartTime", 0);
-    this.onAudioData = onAudioData;
-    this.sampleRate = sampleRate;
-  }
-  /**
-   * Mikrofonu başlatır.
-   */
-  async startMicrophone() {
-    try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-      if (!this.audioContext) {
-        this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
-      }
-      if (this.audioContext.state === "suspended") {
-        await this.audioContext.resume();
-      }
-      const blob = new Blob([AUDIO_WORKLET_CODE], { type: "application/javascript" });
-      const url = URL.createObjectURL(blob);
-      await this.audioContext.audioWorklet.addModule(url);
-      this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
-      this.workletNode = new AudioWorkletNode(this.audioContext, "sentiric-audio-processor");
-      this.workletNode.port.onmessage = (event) => {
-        this.onAudioData(new Uint8Array(event.data));
-      };
-      this.sourceNode.connect(this.workletNode);
-      console.log("🎤 Microphone started.");
-    } catch (err) {
-      console.error("❌ Microphone error:", err);
-      throw err;
-    }
-  }
-  /**
-   * Gateway'den gelen ham ses (PCM) parçalarını hoparlörde çalar.
-   */
-  playChunk(pcmData) {
-    if (!this.audioContext) return;
-    const int16Buffer = new Int16Array(pcmData.buffer);
-    const float32Buffer = new Float32Array(int16Buffer.length);
-    for (let i = 0; i < int16Buffer.length; i++) {
-      float32Buffer[i] = int16Buffer[i] / 32768;
-    }
-    const audioBuffer = this.audioContext.createBuffer(1, float32Buffer.length, this.sampleRate);
-    audioBuffer.getChannelData(0).set(float32Buffer);
-    const source = this.audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(this.audioContext.destination);
-    const currentTime = this.audioContext.currentTime;
-    if (this.nextStartTime < currentTime) {
-      this.nextStartTime = currentTime;
-    }
-    source.start(this.nextStartTime);
-    this.nextStartTime += audioBuffer.duration;
-  }
-  stop() {
-    var _a, _b, _c, _d;
-    (_a = this.workletNode) == null ? void 0 : _a.disconnect();
-    (_b = this.sourceNode) == null ? void 0 : _b.disconnect();
-    (_c = this.mediaStream) == null ? void 0 : _c.getTracks().forEach((track) => track.stop());
-    (_d = this.audioContext) == null ? void 0 : _d.close();
-    this.audioContext = null;
-    console.log("🛑 Audio stopped.");
-  }
-}
 class Logger {
   static setTenant(id) {
     this.tenantId = id;
@@ -5357,6 +5289,152 @@ class Logger {
   }
 }
 __publicField(Logger, "tenantId", "unknown");
+class SentiricAudioManager {
+  constructor(onAudioData, onInterrupt, sampleRate = 24e3) {
+    __publicField(this, "audioContext", null);
+    __publicField(this, "mediaStream", null);
+    __publicField(this, "workletNode", null);
+    __publicField(this, "sourceNode", null);
+    // Playback State
+    __publicField(this, "nextStartTime", 0);
+    __publicField(this, "activeSourceNodes", []);
+    // VAD (Voice Activity Detection) State
+    __publicField(this, "vadThreshold", 0.02);
+    __publicField(this, "vadPauseTime", 1500);
+    // ms
+    __publicField(this, "isSpeaking", false);
+    __publicField(this, "lastSpkTime", 0);
+    this.onAudioData = onAudioData;
+    this.onInterrupt = onInterrupt;
+    this.sampleRate = sampleRate;
+  }
+  /**
+   * Mikrofonu başlatır ve VAD döngüsünü kurar.
+   */
+  async startMicrophone() {
+    try {
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      if (!this.audioContext) {
+        this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
+      }
+      if (this.audioContext.state === "suspended") {
+        await this.audioContext.resume();
+      }
+      const blob = new Blob([AUDIO_WORKLET_CODE], { type: "application/javascript" });
+      const url = URL.createObjectURL(blob);
+      await this.audioContext.audioWorklet.addModule(url);
+      this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+      this.workletNode = new AudioWorkletNode(this.audioContext, "sentiric-audio-processor");
+      this.workletNode.port.onmessage = (event) => {
+        const { pcmData, rms } = event.data;
+        this.handleVadAndEmit(new Uint8Array(pcmData), rms);
+      };
+      this.sourceNode.connect(this.workletNode);
+      Logger.info("MIC_STARTED", "Microphone and VAD engine started.");
+    } catch (err) {
+      Logger.error("MIC_ERROR", "Microphone initialization failed", { error: err });
+      throw err;
+    }
+  }
+  /**
+   * VAD Mantığı (Sessizlikte ağa paket atılmaz, Söz kesmede Interrupt fırlatılır)
+   */
+  handleVadAndEmit(pcmBytes, rms) {
+    if (rms > this.vadThreshold) {
+      this.lastSpkTime = Date.now();
+      if (!this.isSpeaking) {
+        this.isSpeaking = true;
+        Logger.info("VAD_SPEECH_START", "User started speaking. Triggering Barge-in!");
+        this.flushPlayback();
+        this.onInterrupt();
+      }
+      this.onAudioData(pcmBytes);
+    } else {
+      if (this.isSpeaking && Date.now() - this.lastSpkTime > this.vadPauseTime) {
+        this.isSpeaking = false;
+        Logger.info("VAD_SPEECH_STOP", "Silence detected. Pausing audio transmission.");
+      }
+      if (this.isSpeaking) {
+        this.onAudioData(pcmBytes);
+      }
+    }
+  }
+  /**
+   * Mobile/WebView ortamları için dışarıdan PCM16 byte dizisi enjekte etme arayüzü.
+   * Native katmanda mikrofon izni alınıp bu metod çağrılabilir.
+   */
+  injectExternalAudio(pcm16Data, rmsOverride) {
+    let rms = rmsOverride;
+    if (rms === void 0) {
+      let sumSquares = 0;
+      for (let i = 0; i < pcm16Data.length; i++) {
+        const normalized = pcm16Data[i] / 32768;
+        sumSquares += normalized * normalized;
+      }
+      rms = Math.sqrt(sumSquares / pcm16Data.length);
+    }
+    this.handleVadAndEmit(new Uint8Array(pcm16Data.buffer), rms);
+  }
+  /**
+   * Gateway'den gelen ham ses (PCM) parçalarını hoparlörde çalar. (Jitter Buffer)
+   */
+  playChunk(pcmData) {
+    if (!this.audioContext) return;
+    const int16Buffer = new Int16Array(pcmData.buffer);
+    const float32Buffer = new Float32Array(int16Buffer.length);
+    for (let i = 0; i < int16Buffer.length; i++) {
+      float32Buffer[i] = int16Buffer[i] / 32768;
+    }
+    const audioBuffer = this.audioContext.createBuffer(1, float32Buffer.length, this.sampleRate);
+    audioBuffer.getChannelData(0).set(float32Buffer);
+    const source = this.audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(this.audioContext.destination);
+    const currentTime = this.audioContext.currentTime;
+    if (this.nextStartTime < currentTime) {
+      this.nextStartTime = currentTime;
+    }
+    source.start(this.nextStartTime);
+    this.nextStartTime += audioBuffer.duration;
+    this.activeSourceNodes.push(source);
+    source.onended = () => {
+      this.activeSourceNodes = this.activeSourceNodes.filter((n) => n !== source);
+    };
+  }
+  /**
+   * Zero-Latency Barge-in: Çalmakta olan ve sıradaki tüm AI ses tamponlarını boşaltır.
+   */
+  flushPlayback() {
+    if (this.activeSourceNodes.length > 0) {
+      Logger.info("AUDIO_FLUSH", `Flushing ${this.activeSourceNodes.length} active audio nodes.`);
+      this.activeSourceNodes.forEach((node) => {
+        try {
+          node.stop();
+        } catch (e) {
+        }
+      });
+      this.activeSourceNodes = [];
+    }
+    this.nextStartTime = this.audioContext ? this.audioContext.currentTime : 0;
+  }
+  stop() {
+    var _a, _b, _c, _d;
+    this.flushPlayback();
+    (_a = this.workletNode) == null ? void 0 : _a.disconnect();
+    (_b = this.sourceNode) == null ? void 0 : _b.disconnect();
+    (_c = this.mediaStream) == null ? void 0 : _c.getTracks().forEach((track) => track.stop());
+    (_d = this.audioContext) == null ? void 0 : _d.close();
+    this.audioContext = null;
+    this.isSpeaking = false;
+    Logger.info("MIC_STOPPED", "Audio engine stopped cleanly.");
+  }
+}
 class SentiricStreamClient {
   constructor(options) {
     __publicField(this, "ws", null);
@@ -5374,19 +5452,25 @@ class SentiricStreamClient {
     };
     Logger.setTenant(this.options.tenantId);
   }
-  /**
-   * AI Asistanı Başlatır: Bağlantı kurar ve mikrofonu açar.
-   */
   async start() {
     await this.initProtobuf();
     this.audioManager = new SentiricAudioManager(
       (chunk) => this.sendAudio(chunk),
-      // Mikrofondan gelen sesi Gateway'e yolla
+      () => this.sendInterruptSignal(),
+      // VAD söz kesmeyi algıladığında tetiklenir
       this.options.sampleRate
     );
     await this.connect();
     await this.audioManager.startMicrophone();
     Logger.info("SESSION_ACTIVE", "Sentiric AI Session started successfully.");
+  }
+  /**
+   * Dışarıdan ses basmak (Mobil WebView / React Native / Flutter Bridge için)
+   */
+  injectExternalAudio(pcm16Data, rmsOverride) {
+    if (this.audioManager) {
+      this.audioManager.injectExternalAudio(pcm16Data, rmsOverride);
+    }
   }
   async initProtobuf() {
     const root2 = protobuf.Root.fromJSON({
@@ -5398,11 +5482,12 @@ class SentiricStreamClient {
                 v1: {
                   nested: {
                     StreamSessionRequest: {
-                      oneofs: { data: { oneof: ["config", "audioChunk", "textMessage"] } },
+                      oneofs: { data: { oneof: ["config", "audioChunk", "textMessage", "control"] } },
                       fields: {
                         config: { id: 1, type: "SessionConfig" },
                         audioChunk: { id: 2, type: "bytes" },
-                        textMessage: { id: 3, type: "string" }
+                        textMessage: { id: 3, type: "string" },
+                        control: { id: 4, type: "SessionControl" }
                       }
                     },
                     SessionConfig: {
@@ -5411,6 +5496,21 @@ class SentiricStreamClient {
                         language: { id: 2, type: "string" },
                         sampleRate: { id: 3, type: "uint32" },
                         edgeMode: { id: 4, type: "bool" }
+                      }
+                    },
+                    SessionControl: {
+                      fields: {
+                        event: { id: 1, type: "EventType" }
+                      },
+                      nested: {
+                        EventType: {
+                          values: {
+                            EVENT_TYPE_UNSPECIFIED: 0,
+                            EVENT_TYPE_INTERRUPT: 1,
+                            EVENT_TYPE_EOS: 2,
+                            EVENT_TYPE_HANGUP: 3
+                          }
+                        }
                       }
                     },
                     StreamSessionResponse: {
@@ -5445,11 +5545,16 @@ class SentiricStreamClient {
           resolve();
         };
         this.ws.onmessage = (event) => this.handleMessage(event.data);
-        this.ws.onerror = (err) => reject(err);
+        this.ws.onerror = (err) => {
+          Logger.error("WS_ERROR", "WebSocket error occurred", { error: err });
+          reject(err);
+        };
         this.ws.onclose = () => {
           var _a;
+          Logger.warn("WS_CLOSED", "WebSocket connection closed.");
           this.isReady = false;
           (_a = this.audioManager) == null ? void 0 : _a.stop();
+          if (this.options.onClose) this.options.onClose();
         };
       } catch (err) {
         Logger.error("WS_INIT_FAIL", "Failed to initialize WebSocket", { error: err });
@@ -5471,6 +5576,22 @@ class SentiricStreamClient {
     const buffer = this.RequestType.encode(message2).finish();
     this.ws.send(buffer);
   }
+  /**
+   * Sunucuya donanımsal söz kesme (Barge-in) sinyali atar.
+   */
+  sendInterruptSignal() {
+    if (!this.isReady || !this.ws || !this.RequestType) return;
+    const controlPayload = {
+      control: {
+        event: 1
+        // EVENT_TYPE_INTERRUPT
+      }
+    };
+    const message2 = this.RequestType.create(controlPayload);
+    const buffer = this.RequestType.encode(message2).finish();
+    this.ws.send(buffer);
+    Logger.info("SIGNAL_SENT", "EVENT_TYPE_INTERRUPT sent to Gateway.");
+  }
   sendAudio(chunk) {
     if (!this.isReady || !this.ws || !this.RequestType) return;
     const audioPayload = { audioChunk: chunk };
@@ -5490,7 +5611,7 @@ class SentiricStreamClient {
         console.log("🤖 AI:", message2.textResponse);
       }
     } catch (e) {
-      console.error("❌ Decode error:", e);
+      Logger.error("WS_DECODE_ERROR", "Failed to decode incoming Protobuf message", { error: e });
     }
   }
   stop() {
@@ -5628,8 +5749,8 @@ if (!customElements.get("sentiric-voice-widget")) {
   customElements.define("sentiric-voice-widget", SentiricVoiceWidget);
 }
 console.log("🌊 Sentiric Voice SDK Initialized");
-document.getElementById("app-version").innerText = `v${"0.1.2"}`;
-console.log(`🚀 Sentiric SDK v${"0.1.2"} initialized.`);
+document.getElementById("app-version").innerText = `v${"0.1.3"}`;
+console.log(`🚀 Sentiric SDK v${"0.1.3"} initialized.`);
 const gatewayUrl = void 0;
 const widget = document.getElementById("myWidget");
 if (widget) {

@@ -17,14 +17,19 @@ export declare class SentiricStreamClient {
     private RequestType;
     private ResponseType;
     constructor(options: StreamClientOptions);
-    /**
-     * AI Asistanı Başlatır: Bağlantı kurar ve mikrofonu açar.
-     */
     start(): Promise<void>;
+    /**
+     * Dışarıdan ses basmak (Mobil WebView / React Native / Flutter Bridge için)
+     */
+    injectExternalAudio(pcm16Data: Int16Array, rmsOverride?: number): void;
     private initProtobuf;
     private connect;
     private sendSessionConfig;
-    sendAudio(chunk: Uint8Array): void;
+    /**
+     * Sunucuya donanımsal söz kesme (Barge-in) sinyali atar.
+     */
+    private sendInterruptSignal;
+    private sendAudio;
     private handleMessage;
     stop(): void;
 }
