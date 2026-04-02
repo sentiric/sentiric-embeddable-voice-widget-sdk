@@ -1,6 +1,43 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+(function polyfill() {
+  const relList = document.createElement("link").relList;
+  if (relList && relList.supports && relList.supports("modulepreload")) {
+    return;
+  }
+  for (const link of document.querySelectorAll('link[rel="modulepreload"]')) {
+    processPreload(link);
+  }
+  new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type !== "childList") {
+        continue;
+      }
+      for (const node of mutation.addedNodes) {
+        if (node.tagName === "LINK" && node.rel === "modulepreload")
+          processPreload(node);
+      }
+    }
+  }).observe(document, { childList: true, subtree: true });
+  function getFetchOpts(link) {
+    const fetchOpts = {};
+    if (link.integrity) fetchOpts.integrity = link.integrity;
+    if (link.referrerPolicy) fetchOpts.referrerPolicy = link.referrerPolicy;
+    if (link.crossOrigin === "use-credentials")
+      fetchOpts.credentials = "include";
+    else if (link.crossOrigin === "anonymous") fetchOpts.credentials = "omit";
+    else fetchOpts.credentials = "same-origin";
+    return fetchOpts;
+  }
+  function processPreload(link) {
+    if (link.ep)
+      return;
+    link.ep = true;
+    const fetchOpts = getFetchOpts(link);
+    fetch(link.href, fetchOpts);
+  }
+})();
 var commonjsGlobal = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : {};
 function getDefaultExportFromCjs(x) {
   return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
@@ -1344,24 +1381,24 @@ function codegen(functionParams, functionName) {
   return Codegen;
 }
 codegen.verbose = false;
-var fetch_1 = fetch;
+var fetch_1 = fetch$1;
 var asPromise = aspromise, inquire = inquire_1;
 var fs = inquire("fs");
-function fetch(filename, options, callback) {
+function fetch$1(filename, options, callback) {
   if (typeof options === "function") {
     callback = options;
     options = {};
   } else if (!options)
     options = {};
   if (!callback)
-    return asPromise(fetch, this, filename, options);
+    return asPromise(fetch$1, this, filename, options);
   if (!options.xhr && fs && fs.readFile)
     return fs.readFile(filename, function fetchReadFileCallback(err, contents) {
-      return err && typeof XMLHttpRequest !== "undefined" ? fetch.xhr(filename, options, callback) : err ? callback(err) : callback(null, options.binary ? contents : contents.toString("utf8"));
+      return err && typeof XMLHttpRequest !== "undefined" ? fetch$1.xhr(filename, options, callback) : err ? callback(err) : callback(null, options.binary ? contents : contents.toString("utf8"));
     });
-  return fetch.xhr(filename, options, callback);
+  return fetch$1.xhr(filename, options, callback);
 }
-fetch.xhr = function fetch_xhr(filename, options, callback) {
+fetch$1.xhr = function fetch_xhr(filename, options, callback) {
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function fetchOnReadyStateChange() {
     if (xhr.readyState !== 4)
@@ -5486,15 +5523,15 @@ class SentiricVoiceWidget extends HTMLElement {
     }
   }
   async start() {
-    const gatewayUrl = this.getAttribute("gateway-url") || "";
+    const gatewayUrl2 = this.getAttribute("gateway-url") || "";
     const tenantId = this.getAttribute("tenant-id") || "";
     const language = this.getAttribute("language") || "tr-TR";
-    if (!gatewayUrl || !tenantId) {
+    if (!gatewayUrl2 || !tenantId) {
       console.error("❌ Sentiric: gateway-url and tenant-id are required!");
       return;
     }
     this.client = new SentiricStreamClient({
-      gatewayUrl,
+      gatewayUrl: gatewayUrl2,
       tenantId,
       language,
       onClose: () => this.stop(),
@@ -5591,6 +5628,13 @@ if (!customElements.get("sentiric-voice-widget")) {
   customElements.define("sentiric-voice-widget", SentiricVoiceWidget);
 }
 console.log("🌊 Sentiric Voice SDK Initialized");
-export {
-  SentiricStreamClient
-};
+document.getElementById("app-version").innerText = `v${"0.1.1"}`;
+console.log(`🚀 Sentiric SDK v${"0.1.1"} initialized.`);
+const gatewayUrl = void 0;
+const widget = document.getElementById("myWidget");
+if (widget) {
+  widget.setAttribute("gateway-url", gatewayUrl);
+  console.log("🚀 Sentiric: Gateway URL configured as:", gatewayUrl);
+} else {
+  console.error("❌ Sentiric Widget not found in DOM!");
+}
