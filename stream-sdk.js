@@ -5258,8 +5258,13 @@ class SentiricAudioProcessor extends AudioWorkletProcessor {
 registerProcessor('sentiric-audio-processor', SentiricAudioProcessor);
 `;
 class Logger {
-  static setTenant(id) {
-    this.tenantId = id;
+  static setContext(tenantId, traceId, sessionId) {
+    this.tenantId = tenantId;
+    this.traceId = traceId;
+    this.sessionId = sessionId;
+  }
+  static generateSpanId() {
+    return Math.random().toString(16).substring(2, 18).padStart(16, "0");
   }
   static log(severity, event, message2, attributes = {}) {
     const record = {
@@ -5268,13 +5273,19 @@ class Logger {
       severity,
       tenant_id: this.tenantId,
       resource: {
-        "service.name": "voice-widget-sdk",
-        "service.version": "0.1.0",
+        "service.name": "sentiric-stream-sdk",
+        "service.version": "0.1.4",
+        // Yeni versiyona uyumlu
         "service.env": "production"
       },
+      trace_id: this.traceId,
+      span_id: this.generateSpanId(),
       event,
       message: message2,
-      attributes
+      attributes: {
+        session_id: this.sessionId,
+        ...attributes
+      }
     };
     console.debug(JSON.stringify(record));
   }
@@ -5289,6 +5300,8 @@ class Logger {
   }
 }
 __publicField(Logger, "tenantId", "unknown");
+__publicField(Logger, "traceId", null);
+__publicField(Logger, "sessionId", null);
 class SentiricAudioManager {
   constructor(onAudioData, onInterrupt, sampleRate = 24e3) {
     __publicField(this, "audioContext", null);
@@ -5435,6 +5448,12 @@ class SentiricAudioManager {
     Logger.info("MIC_STOPPED", "Audio engine stopped cleanly.");
   }
 }
+function generateUUID() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === "x" ? r : r & 3 | 8;
+    return v.toString(16);
+  });
+}
 class SentiricStreamClient {
   constructor(options) {
     __publicField(this, "ws", null);
@@ -5443,6 +5462,14 @@ class SentiricStreamClient {
     __publicField(this, "audioManager", null);
     __publicField(this, "RequestType", null);
     __publicField(this, "ResponseType", null);
+    // Resilience (Dayanıklılık) State
+    __publicField(this, "isIntentionallyStopped", false);
+    __publicField(this, "retryCount", 0);
+    __publicField(this, "maxRetries", 5);
+    __publicField(this, "traceId");
+    __publicField(this, "sessionId");
+    this.traceId = options.traceId || generateUUID();
+    this.sessionId = options.sessionId || generateUUID();
     this.options = {
       language: "tr-TR",
       sampleRate: 24e3,
@@ -5450,23 +5477,21 @@ class SentiricStreamClient {
       token: "guest-token",
       ...options
     };
-    Logger.setTenant(this.options.tenantId);
+    Logger.setContext(this.options.tenantId, this.traceId, this.sessionId);
   }
   async start() {
+    this.isIntentionallyStopped = false;
+    this.retryCount = 0;
     await this.initProtobuf();
     this.audioManager = new SentiricAudioManager(
       (chunk) => this.sendAudio(chunk),
       () => this.sendInterruptSignal(),
-      // VAD söz kesmeyi algıladığında tetiklenir
       this.options.sampleRate
     );
-    await this.connect();
+    await this.connect(true);
     await this.audioManager.startMicrophone();
     Logger.info("SESSION_ACTIVE", "Sentiric AI Session started successfully.");
   }
-  /**
-   * Dışarıdan ses basmak (Mobil WebView / React Native / Flutter Bridge için)
-   */
   injectExternalAudio(pcm16Data, rmsOverride) {
     if (this.audioManager) {
       this.audioManager.injectExternalAudio(pcm16Data, rmsOverride);
@@ -5496,20 +5521,14 @@ class SentiricStreamClient {
                         language: { id: 2, type: "string" },
                         sampleRate: { id: 3, type: "uint32" },
                         edgeMode: { id: 4, type: "bool" }
+                        // Not: Gelecekte protobuf güncellendiğinde sessionId ve traceId buraya eklenecek.
                       }
                     },
                     SessionControl: {
-                      fields: {
-                        event: { id: 1, type: "EventType" }
-                      },
+                      fields: { event: { id: 1, type: "EventType" } },
                       nested: {
                         EventType: {
-                          values: {
-                            EVENT_TYPE_UNSPECIFIED: 0,
-                            EVENT_TYPE_INTERRUPT: 1,
-                            EVENT_TYPE_EOS: 2,
-                            EVENT_TYPE_HANGUP: 3
-                          }
+                          values: { EVENT_TYPE_UNSPECIFIED: 0, EVENT_TYPE_INTERRUPT: 1, EVENT_TYPE_EOS: 2, EVENT_TYPE_HANGUP: 3 }
                         }
                       }
                     },
@@ -5532,34 +5551,48 @@ class SentiricStreamClient {
     this.RequestType = root2.lookupType("sentiric.stream.v1.StreamSessionRequest");
     this.ResponseType = root2.lookupType("sentiric.stream.v1.StreamSessionResponse");
   }
-  async connect() {
+  /**
+   * Exponential Backoff ile ağ bağlantısını kurar ve korur.
+   */
+  async connect(isInitial = false) {
     return new Promise((resolve, reject) => {
-      try {
-        Logger.info("WS_CONNECTING", `Connecting to ${this.options.gatewayUrl}`);
+      const attempt = () => {
+        Logger.info("WS_CONNECTING", `Connecting to gateway...`, { attempt: this.retryCount });
         this.ws = new WebSocket(this.options.gatewayUrl);
         this.ws.binaryType = "arraybuffer";
         this.ws.onopen = () => {
           Logger.info("WS_CONNECTED", "WebSocket connection established.");
-          this.sendSessionConfig();
+          this.retryCount = 0;
           this.isReady = true;
+          this.sendSessionConfig();
           resolve();
         };
         this.ws.onmessage = (event) => this.handleMessage(event.data);
         this.ws.onerror = (err) => {
-          Logger.error("WS_ERROR", "WebSocket error occurred", { error: err });
-          reject(err);
+          Logger.warn("WS_ERROR", "WebSocket encountered an error.");
         };
         this.ws.onclose = () => {
           var _a;
-          Logger.warn("WS_CLOSED", "WebSocket connection closed.");
           this.isReady = false;
-          (_a = this.audioManager) == null ? void 0 : _a.stop();
-          if (this.options.onClose) this.options.onClose();
+          if (this.isIntentionallyStopped) {
+            Logger.info("WS_CLOSED", "Connection closed intentionally.");
+            return;
+          }
+          if (this.retryCount < this.maxRetries) {
+            this.retryCount++;
+            const backoffMs = Math.min(3e4, 1e3 * Math.pow(2, this.retryCount - 1));
+            Logger.warn("WS_RECONNECTING", `Connection lost. Retrying in ${backoffMs}ms...`, { attempt: this.retryCount });
+            setTimeout(attempt, backoffMs);
+          } else {
+            Logger.error("WS_DISCONNECTED_FATAL", "Max reconnection attempts reached. Session dead.");
+            (_a = this.audioManager) == null ? void 0 : _a.stop();
+            if (isInitial) reject(new Error("Failed to connect to gateway after multiple attempts"));
+            if (this.options.onError) this.options.onError(new Error("Connection lost permanently"));
+            if (this.options.onClose) this.options.onClose();
+          }
         };
-      } catch (err) {
-        Logger.error("WS_INIT_FAIL", "Failed to initialize WebSocket", { error: err });
-        reject(err);
-      }
+      };
+      attempt();
     });
   }
   sendSessionConfig() {
@@ -5576,17 +5609,9 @@ class SentiricStreamClient {
     const buffer = this.RequestType.encode(message2).finish();
     this.ws.send(buffer);
   }
-  /**
-   * Sunucuya donanımsal söz kesme (Barge-in) sinyali atar.
-   */
   sendInterruptSignal() {
     if (!this.isReady || !this.ws || !this.RequestType) return;
-    const controlPayload = {
-      control: {
-        event: 1
-        // EVENT_TYPE_INTERRUPT
-      }
-    };
+    const controlPayload = { control: { event: 1 } };
     const message2 = this.RequestType.create(controlPayload);
     const buffer = this.RequestType.encode(message2).finish();
     this.ws.send(buffer);
@@ -5608,7 +5633,6 @@ class SentiricStreamClient {
         (_a = this.audioManager) == null ? void 0 : _a.playChunk(message2.audioResponse);
         if (this.options.onAudioReceived) this.options.onAudioReceived(message2.audioResponse);
       } else if (message2.textResponse) {
-        console.log("🤖 AI:", message2.textResponse);
       }
     } catch (e) {
       Logger.error("WS_DECODE_ERROR", "Failed to decode incoming Protobuf message", { error: e });
@@ -5616,9 +5640,11 @@ class SentiricStreamClient {
   }
   stop() {
     var _a, _b;
+    this.isIntentionallyStopped = true;
+    this.isReady = false;
     (_a = this.ws) == null ? void 0 : _a.close();
     (_b = this.audioManager) == null ? void 0 : _b.stop();
-    this.isReady = false;
+    Logger.info("SESSION_STOPPED", "Client manually stopped the session.");
   }
 }
 class SentiricVoiceWidget extends HTMLElement {
@@ -5749,9 +5775,9 @@ if (!customElements.get("sentiric-voice-widget")) {
   customElements.define("sentiric-voice-widget", SentiricVoiceWidget);
 }
 console.log("🌊 Sentiric Voice SDK Initialized");
-document.getElementById("app-version").innerText = `v${"0.1.3"}`;
-console.log(`🚀 Sentiric SDK v${"0.1.3"} initialized.`);
-const gatewayUrl = void 0;
+document.getElementById("app-version").innerText = `v${"0.1.4"}`;
+console.log(`🚀 Sentiric SDK v${"0.1.4"} initialized.`);
+const gatewayUrl = "wss://http-stream-gateway-service-sentiric.azmisahin.com";
 const widget = document.getElementById("myWidget");
 if (widget) {
   widget.setAttribute("gateway-url", gatewayUrl);

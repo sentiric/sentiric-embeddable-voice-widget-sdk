@@ -1,6 +1,8 @@
 export interface StreamClientOptions {
     gatewayUrl: string;
     tenantId: string;
+    traceId?: string;
+    sessionId?: string;
     token?: string;
     language?: string;
     sampleRate?: number;
@@ -16,18 +18,20 @@ export declare class SentiricStreamClient {
     private audioManager;
     private RequestType;
     private ResponseType;
+    private isIntentionallyStopped;
+    private retryCount;
+    private readonly maxRetries;
+    readonly traceId: string;
+    readonly sessionId: string;
     constructor(options: StreamClientOptions);
     start(): Promise<void>;
-    /**
-     * Dışarıdan ses basmak (Mobil WebView / React Native / Flutter Bridge için)
-     */
     injectExternalAudio(pcm16Data: Int16Array, rmsOverride?: number): void;
     private initProtobuf;
+    /**
+     * Exponential Backoff ile ağ bağlantısını kurar ve korur.
+     */
     private connect;
     private sendSessionConfig;
-    /**
-     * Sunucuya donanımsal söz kesme (Barge-in) sinyali atar.
-     */
     private sendInterruptSignal;
     private sendAudio;
     private handleMessage;
