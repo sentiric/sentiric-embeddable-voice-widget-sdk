@@ -1,4 +1,7 @@
+// File: src/core/audio-manager.ts
+
 import { AUDIO_WORKLET_CODE } from './audio-processor-worklet';
+import { Logger } from '../utils/logger';
 
 export class SentiricAudioManager {
   private audioContext: AudioContext | null = null;
@@ -6,16 +9,24 @@ export class SentiricAudioManager {
   private workletNode: AudioWorkletNode | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   
-  // Playback için zamanlama (Scheduling) değişkenleri
+  // Playback State
   private nextStartTime: number = 0;
+  private activeSourceNodes: AudioBufferSourceNode[] = [];
+
+  // VAD (Voice Activity Detection) State
+  public vadThreshold: number = 0.02;
+  public vadPauseTime: number = 1500; // ms
+  private isSpeaking: boolean = false;
+  private lastSpkTime: number = 0;
 
   constructor(
     private onAudioData: (data: Uint8Array) => void,
+    private onInterrupt: () => void,
     private sampleRate: number = 24000
   ) {}
 
   /**
-   * Mikrofonu başlatır.
+   * Mikrofonu başlatır ve VAD döngüsünü kurar.
    */
   public async startMicrophone(): Promise<void> {
     try {
@@ -43,24 +54,71 @@ export class SentiricAudioManager {
       this.workletNode = new AudioWorkletNode(this.audioContext, 'sentiric-audio-processor');
 
       this.workletNode.port.onmessage = (event) => {
-        this.onAudioData(new Uint8Array(event.data));
+        const { pcmData, rms } = event.data;
+        this.handleVadAndEmit(new Uint8Array(pcmData), rms);
       };
 
       this.sourceNode.connect(this.workletNode);
-      console.log('🎤 Microphone started.');
+      Logger.info("MIC_STARTED", "Microphone and VAD engine started.");
     } catch (err) {
-      console.error('❌ Microphone error:', err);
+      Logger.error("MIC_ERROR", "Microphone initialization failed", { error: err });
       throw err;
     }
   }
 
   /**
-   * Gateway'den gelen ham ses (PCM) parçalarını hoparlörde çalar.
+   * VAD Mantığı (Sessizlikte ağa paket atılmaz, Söz kesmede Interrupt fırlatılır)
+   */
+  private handleVadAndEmit(pcmBytes: Uint8Array, rms: number) {
+    if (rms > this.vadThreshold) {
+      this.lastSpkTime = Date.now();
+      
+      if (!this.isSpeaking) {
+        this.isSpeaking = true;
+        Logger.info("VAD_SPEECH_START", "User started speaking. Triggering Barge-in!");
+        this.flushPlayback(); // Çalan AI sesini yerelde sustur
+        this.onInterrupt();   // Sunucuya INTERRUPT at
+      }
+      
+      // Konuşma anında sesi gönder
+      this.onAudioData(pcmBytes);
+    } else {
+      if (this.isSpeaking && (Date.now() - this.lastSpkTime > this.vadPauseTime)) {
+        this.isSpeaking = false;
+        Logger.info("VAD_SPEECH_STOP", "Silence detected. Pausing audio transmission.");
+      }
+
+      // VAD Timeout bitmediyse kuyruk sesleri (nefes, yankı) de gönderilir.
+      // Timeout bittiyse sessizlik ağa GÖNDERİLMEZ. (Bant genişliği tasarrufu)
+      if (this.isSpeaking) {
+        this.onAudioData(pcmBytes);
+      }
+    }
+  }
+
+  /**
+   * Mobile/WebView ortamları için dışarıdan PCM16 byte dizisi enjekte etme arayüzü.
+   * Native katmanda mikrofon izni alınıp bu metod çağrılabilir.
+   */
+  public injectExternalAudio(pcm16Data: Int16Array, rmsOverride?: number) {
+    let rms = rmsOverride;
+    if (rms === undefined) {
+      let sumSquares = 0;
+      for (let i = 0; i < pcm16Data.length; i++) {
+        const normalized = pcm16Data[i] / 0x8000;
+        sumSquares += normalized * normalized;
+      }
+      rms = Math.sqrt(sumSquares / pcm16Data.length);
+    }
+    this.handleVadAndEmit(new Uint8Array(pcm16Data.buffer), rms);
+  }
+
+  /**
+   * Gateway'den gelen ham ses (PCM) parçalarını hoparlörde çalar. (Jitter Buffer)
    */
   public playChunk(pcmData: Uint8Array): void {
     if (!this.audioContext) return;
 
-    // Uint8Array (bytes) -> Int16Array -> Float32Array (Web Audio API standardı)
     const int16Buffer = new Int16Array(pcmData.buffer);
     const float32Buffer = new Float32Array(int16Buffer.length);
 
@@ -75,7 +133,6 @@ export class SentiricAudioManager {
     source.buffer = audioBuffer;
     source.connect(this.audioContext.destination);
 
-    // Ses parçalarını uç uca ekleyerek pürüzsüz çal (Jitter Scheduling)
     const currentTime = this.audioContext.currentTime;
     if (this.nextStartTime < currentTime) {
       this.nextStartTime = currentTime;
@@ -83,14 +140,36 @@ export class SentiricAudioManager {
 
     source.start(this.nextStartTime);
     this.nextStartTime += audioBuffer.duration;
+
+    // Aktif node'ları izle (Barge-in anında susturmak için)
+    this.activeSourceNodes.push(source);
+    source.onended = () => {
+      this.activeSourceNodes = this.activeSourceNodes.filter(n => n !== source);
+    };
+  }
+
+  /**
+   * Zero-Latency Barge-in: Çalmakta olan ve sıradaki tüm AI ses tamponlarını boşaltır.
+   */
+  public flushPlayback(): void {
+    if (this.activeSourceNodes.length > 0) {
+      Logger.info("AUDIO_FLUSH", `Flushing ${this.activeSourceNodes.length} active audio nodes.`);
+      this.activeSourceNodes.forEach(node => {
+        try { node.stop(); } catch (e) {} // Zaten bittiyse hatayı yut
+      });
+      this.activeSourceNodes = [];
+    }
+    this.nextStartTime = this.audioContext ? this.audioContext.currentTime : 0;
   }
 
   public stop(): void {
+    this.flushPlayback();
     this.workletNode?.disconnect();
     this.sourceNode?.disconnect();
     this.mediaStream?.getTracks().forEach((track) => track.stop());
     this.audioContext?.close();
     this.audioContext = null;
-    console.log('🛑 Audio stopped.');
+    this.isSpeaking = false;
+    Logger.info("MIC_STOPPED", "Audio engine stopped cleanly.");
   }
 }
