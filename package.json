@@ -1,7 +1,10 @@
 {
   "name": "@sentiric/stream-sdk",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Universal Sentiric Stream SDK. High-performance communication engine for Voice, Chat and AI interactions.",
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "main": "./dist/stream-sdk.umd.cjs",
   "module": "./dist/stream-sdk.js",
@@ -21,11 +24,10 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "terser": "^5.27.0",
-    "typescript": "^5.3.3",
-    "vite": "^5.1.0",
-    "vite-plugin-dts": "^3.7.2"
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3"
   },
   "dependencies": {
-    "protobufjs": "^7.2.5"
+    "protobufjs": "^8.0.0"
   }
 }

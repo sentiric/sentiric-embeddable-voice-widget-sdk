@@ -1,14 +1,18 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import dts from 'vite-plugin-dts';
-import pkg from './package.json'; // package.json'ı içeri al
+import pkg from './package.json';
 
 export default defineConfig({
-  base: './', 
-  
-  // VERSİYONU OTOMATİK TANIMLA
+  base: './',
+
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+  },
+
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
   },
 
   build: {
@@ -18,15 +22,14 @@ export default defineConfig({
       fileName: (format) => `stream-sdk.${format === 'es' ? 'js' : 'umd.js'}`,
       formats: ['es', 'umd'],
     },
+    minify: 'terser',
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
       },
       output: {
-        inlineDynamicImports: false 
+        inlineDynamicImports: false
       }
     },
-    minify: 'terser',
-  },
-  plugins: [dts({ insertTypesEntry: true })],
+  }
 });

@@ -3,6 +3,7 @@
 import { AUDIO_WORKLET_CODE } from './audio-processor-worklet';
 import { Logger } from '../utils/logger';
 
+// [ARCH-COMPLIANCE] VAD Hassasiyeti web mikrofonları için optimize edildi.
 export class SentiricAudioManager {
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
@@ -14,7 +15,8 @@ export class SentiricAudioManager {
   private activeSourceNodes: AudioBufferSourceNode[] = [];
 
   // VAD (Voice Activity Detection) State
-  public vadThreshold: number = 0.02;
+  // ESKİ: public vadThreshold: number = 0.02;
+  public vadThreshold: number = 0.010; // YENİ: Daha hassas dinleme eşiği
   public vadPauseTime: number = 1500; // ms
   private isSpeaking: boolean = false;
   private lastSpkTime: number = 0;
