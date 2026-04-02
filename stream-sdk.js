@@ -5628,8 +5628,8 @@ if (!customElements.get("sentiric-voice-widget")) {
   customElements.define("sentiric-voice-widget", SentiricVoiceWidget);
 }
 console.log("🌊 Sentiric Voice SDK Initialized");
-document.getElementById("app-version").innerText = `v${"0.1.1"}`;
-console.log(`🚀 Sentiric SDK v${"0.1.1"} initialized.`);
+document.getElementById("app-version").innerText = `v${"0.1.2"}`;
+console.log(`🚀 Sentiric SDK v${"0.1.2"} initialized.`);
 const gatewayUrl = void 0;
 const widget = document.getElementById("myWidget");
 if (widget) {
