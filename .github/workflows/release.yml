@@ -1,0 +1,41 @@
+name: Release Sentiric Stream SDK
+
+on:
+  push:
+    tags:
+      - 'v*' # v1.0.0 gibi bir tag attığında tetiklenir
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@sentiric'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build SDK
+        run: npm run build
+
+      # dist klasöründeki dosyaları CDN olarak kullanmak için gh-pages branchine atar
+      - name: Deploy to GitHub Pages (CDN)
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist
+          branch: gh-pages
+
+      # GitHub NPM Registry'e yayınla
+      - name: Publish to GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
