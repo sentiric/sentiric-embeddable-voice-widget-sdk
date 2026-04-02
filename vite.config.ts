@@ -15,7 +15,7 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'SentiricStream',
-      fileName: 'stream-sdk',
+      fileName: (format) => `stream-sdk.${format === 'es' ? 'js' : 'umd.js'}`,
       formats: ['es', 'umd'],
     },
     rollupOptions: {

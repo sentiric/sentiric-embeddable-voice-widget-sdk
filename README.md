@@ -7,7 +7,7 @@ Web sitenize sesli asistan eklemek için aşağıdaki kodu HTML'inize yapıştı
 
 ```html
 <!-- Sentiric Stream SDK -->
-<script src="https://sentiric.github.io/sentiric-stream-sdk/stream-sdk.umd.cjs"></script>
+<script type="module" src="https://sentiric.github.io/sentiric-stream-sdk/stream-sdk.js"></script>
 
 <!-- Asistan Widget -->
 <sentiric-voice-widget 
