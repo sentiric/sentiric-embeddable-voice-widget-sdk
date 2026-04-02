@@ -1,0 +1,5 @@
+/**
+ * Bu kod tarayıcının ses thread'inde (AudioWorklet) çalışır.
+ * Ana thread'i yormadan ham ses verisini işler.
+ */
+export declare const AUDIO_WORKLET_CODE = "\nclass SentiricAudioProcessor extends AudioWorkletProcessor {\n  constructor() {\n    super();\n  }\n\n  process(inputs, outputs, parameters) {\n    const input = inputs[0];\n    if (input.length > 0) {\n      const channelData = input[0]; // Mono kanal verisi\n      \n      // Float32 -> Int16 \u00C7evrimi (PCM)\n      const pcmData = new Int16Array(channelData.length);\n      for (let i = 0; i < channelData.length; i++) {\n        // Sesi normalize et ve s\u0131n\u0131rla\n        const s = Math.max(-1, Math.min(1, channelData[i]));\n        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;\n      }\n\n      // Ana thread'e i\u015Flenmi\u015F paketi g\u00F6nder\n      this.port.postMessage(pcmData.buffer, [pcmData.buffer]);\n    }\n    return true;\n  }\n}\n\nregisterProcessor('sentiric-audio-processor', SentiricAudioProcessor);\n";
