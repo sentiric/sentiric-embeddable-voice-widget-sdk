@@ -80,6 +80,9 @@ export class SentiricVoiceWidget extends HTMLElement {
   private handleTranscript(data: any) {
     if (!this.transcriptBox) return;
 
+    // Gelen veriyi console'a basalım ki debug edebilelim
+    console.log("DOM Updating with transcript:", data);
+
     const msgClass = data.sender === 'USER' ? 'user' : 'ai';
     const activeMsgId = `msg-${msgClass}-active`;
     
@@ -94,7 +97,6 @@ export class SentiricVoiceWidget extends HTMLElement {
 
     msgEl.innerText = data.text;
 
-    // [CRITICAL FIX]: Protobuf.js snake_case'i camelCase'e çevirir. İki ihtimali de destekle.
     const isFinal = data.isFinal !== undefined ? data.isFinal : data.is_final;
 
     if (isFinal) {
@@ -104,7 +106,6 @@ export class SentiricVoiceWidget extends HTMLElement {
         msgEl.classList.add('partial');
     }
 
-    // Scroll'u pürüzsüzce en alta kaydır
     this.transcriptBox.scrollTo({
       top: this.transcriptBox.scrollHeight,
       behavior: 'smooth'

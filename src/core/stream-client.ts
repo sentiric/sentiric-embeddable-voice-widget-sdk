@@ -246,7 +246,10 @@ export class SentiricStreamClient {
         this.audioManager?.flushPlayback();
       }
       else if (message.transcript) {
-        if (this.options.onTranscript) this.options.onTranscript(message.transcript);
+        Logger.info("TRANSCRIPT_RECEIVED", "Received text from AI Pipeline", { text: message.transcript.text });
+        if (this.options.onTranscript) {
+             this.options.onTranscript(message.transcript);
+        }
       }
       else if (message.textResponse) {
         // Legacy metin yanıtı (kullanılmıyor, ancak kırılmaması için tutuldu)
