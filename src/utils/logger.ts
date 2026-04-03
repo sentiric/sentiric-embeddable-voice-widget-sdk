@@ -1,12 +1,16 @@
 // File: src/utils/logger.ts
 
 /**
- * Sentiric SUTS v4.0 Lightweight Logger for SDK
+ * Sentiric Logger for SDK
+ * Geliştirici dostu (Pretty Print) ve SUTS v4.0 (JSON) uyumlu hibrit logger.
  */
 export class Logger {
   private static tenantId: string = 'unknown';
   private static traceId: string | null = null;
   private static sessionId: string | null = null;
+  
+  // [YENİ] Geliştirici modunda JSON yerine renkli, okunabilir konsol çıktıları verir.
+  public static debugMode: boolean = true; 
 
   static setContext(tenantId: string, traceId: string, sessionId: string) {
     this.tenantId = tenantId;
@@ -19,6 +23,22 @@ export class Logger {
   }
 
   private static log(severity: string, event: string, message: string, attributes: any = {}) {
+    if (this.debugMode) {
+      // --- PRETTY PRINT MODE (Geliştirici Dostu) ---
+      const time = new Date().toLocaleTimeString('en-US', { hour12: false, fractionalSecondDigits: 3 });
+      let color = 'color: #3b82f6; font-weight: bold;'; // INFO (Mavi)
+      if (severity === 'WARN') color = 'color: #f59e0b; font-weight: bold;'; // Sarı
+      if (severity === 'ERROR') color = 'color: #ef4444; font-weight: bold;'; // Kırmızı
+      
+      console.log(
+        `%c[${time}] [${severity}] [${event}]%c ${message}`,
+        color, 'color: inherit;',
+        Object.keys(attributes).length ? attributes : ''
+      );
+      return; // Pretty print ise JSON basma.
+    }
+
+    // --- SUTS v4.0 JSON MODE (Sunucu / Production) ---
     const record = {
       schema_v: "1.0.0",
       ts: new Date().toISOString(),
@@ -26,7 +46,7 @@ export class Logger {
       tenant_id: this.tenantId,
       resource: {
         "service.name": "sentiric-stream-sdk",
-        "service.version": "0.1.4", // Yeni versiyona uyumlu
+        "service.version": "0.1.12", 
         "service.env": "production"
       },
       trace_id: this.traceId,
@@ -38,20 +58,10 @@ export class Logger {
         ...attributes
       }
     };
-
-    // SUTS v4.0 Anayasasına göre loglar JSON olarak standart çıktıya (console) basılır.
     console.debug(JSON.stringify(record));
   }
 
-  static info(event: string, message: string, attrs: any = {}) {
-    this.log("INFO", event, message, attrs);
-  }
-
-  static warn(event: string, message: string, attrs: any = {}) {
-    this.log("WARN", event, message, attrs);
-  }
-
-  static error(event: string, message: string, attrs: any = {}) {
-    this.log("ERROR", event, message, attrs);
-  }
+  static info(event: string, message: string, attrs: any = {}) { this.log("INFO", event, message, attrs); }
+  static warn(event: string, message: string, attrs: any = {}) { this.log("WARN", event, message, attrs); }
+  static error(event: string, message: string, attrs: any = {}) { this.log("ERROR", event, message, attrs); }
 }
