@@ -105,7 +105,9 @@ export class SentiricStreamClient {
                         token: { id: 1, type: "string" },
                         language: { id: 2, type: "string" },
                         sampleRate: { id: 3, type: "uint32" },
-                        edgeMode: { id: 4, type: "bool" }
+                        edgeMode: { id: 4, type: "bool" },
+                        trace_id: { id: 5, type: "string" },   // [YENİ]
+                        session_id: { id: 6, type: "string" }  // [YENİ]
                       }
                     },
                     SessionControl: {
@@ -198,6 +200,7 @@ export class SentiricStreamClient {
     });
   }
 
+  // sendSessionConfig metodunu güncelleyin:
   private sendSessionConfig() {
     if (!this.ws || !this.RequestType) return;
     const configPayload = {
@@ -205,7 +208,9 @@ export class SentiricStreamClient {
         token: this.options.token,
         language: this.options.language,
         sampleRate: this.options.sampleRate,
-        edgeMode: this.options.edgeMode
+        edgeMode: this.options.edgeMode,
+        trace_id: this.traceId,     // [ARCH-COMPLIANCE] Bağlam Koruması
+        session_id: this.sessionId  // [ARCH-COMPLIANCE] Bağlam Koruması
       }
     };
     const message = this.RequestType.create(configPayload);
