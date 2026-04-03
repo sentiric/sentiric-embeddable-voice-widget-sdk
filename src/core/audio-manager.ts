@@ -1,9 +1,6 @@
-// File: src/core/audio-manager.ts
-
 import { AUDIO_WORKLET_CODE } from './audio-processor-worklet';
 import { Logger } from '../utils/logger';
 
-// [ARCH-COMPLIANCE] VAD Hassasiyeti web mikrofonları için optimize edildi.
 export class SentiricAudioManager {
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
@@ -15,11 +12,14 @@ export class SentiricAudioManager {
   private activeSourceNodes: AudioBufferSourceNode[] = [];
 
   // VAD (Voice Activity Detection) State
-  // ESKİ: public vadThreshold: number = 0.02;
-  public vadThreshold: number = 0.010; // YENİ: Daha hassas dinleme eşiği
+  public vadThreshold: number = 0.015; // [CRITICAL FIX]: 0.010'dan 0.015'e çıkarıldı (Arka plan gürültüsü için)
   public vadPauseTime: number = 1500; // ms
   private isSpeaking: boolean = false;
   private lastSpkTime: number = 0;
+  
+  // [CRITICAL FIX]: Ani patlamaları (nefes, tıkırtı) "Söz Kesme" saymamak için debouncer eklendi.
+  private speechFramesCount: number = 0;
+  private readonly SPEECH_FRAMES_REQUIRED: number = 5; 
 
   constructor(
     private onAudioData: (data: Uint8Array) => void,
@@ -27,9 +27,6 @@ export class SentiricAudioManager {
     private sampleRate: number = 24000
   ) {}
 
-  /**
-   * Mikrofonu başlatır ve VAD döngüsünü kurar.
-   */
   public async startMicrophone(): Promise<void> {
     try {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -68,40 +65,36 @@ export class SentiricAudioManager {
     }
   }
 
-  /**
-   * VAD Mantığı (Sessizlikte ağa paket atılmaz, Söz kesmede Interrupt fırlatılır)
-   */
   private handleVadAndEmit(pcmBytes: Uint8Array, rms: number) {
     if (rms > this.vadThreshold) {
       this.lastSpkTime = Date.now();
       
-      if (!this.isSpeaking) {
+      // [CRITICAL FIX]: Anında tetiklemek yerine çerçeve (frame) sayıyoruz.
+      this.speechFramesCount++;
+      
+      if (!this.isSpeaking && this.speechFramesCount >= this.SPEECH_FRAMES_REQUIRED) {
         this.isSpeaking = true;
-        Logger.info("VAD_SPEECH_START", "User started speaking. Triggering Barge-in!");
-        this.flushPlayback(); // Çalan AI sesini yerelde sustur
-        this.onInterrupt();   // Sunucuya INTERRUPT at
+        Logger.info("VAD_SPEECH_START", "Valid speech detected. Triggering Barge-in!");
+        this.flushPlayback(); 
+        this.onInterrupt();   
       }
       
-      // Konuşma anında sesi gönder
       this.onAudioData(pcmBytes);
     } else {
+      // Ses kesildiğinde frame sayacını sıfırla (Anlık patlamaları elemek için)
+      this.speechFramesCount = 0;
+
       if (this.isSpeaking && (Date.now() - this.lastSpkTime > this.vadPauseTime)) {
         this.isSpeaking = false;
         Logger.info("VAD_SPEECH_STOP", "Silence detected. Pausing audio transmission.");
       }
 
-      // VAD Timeout bitmediyse kuyruk sesleri (nefes, yankı) de gönderilir.
-      // Timeout bittiyse sessizlik ağa GÖNDERİLMEZ. (Bant genişliği tasarrufu)
       if (this.isSpeaking) {
         this.onAudioData(pcmBytes);
       }
     }
   }
 
-  /**
-   * Mobile/WebView ortamları için dışarıdan PCM16 byte dizisi enjekte etme arayüzü.
-   * Native katmanda mikrofon izni alınıp bu metod çağrılabilir.
-   */
   public injectExternalAudio(pcm16Data: Int16Array, rmsOverride?: number) {
     let rms = rmsOverride;
     if (rms === undefined) {
@@ -115,9 +108,6 @@ export class SentiricAudioManager {
     this.handleVadAndEmit(new Uint8Array(pcm16Data.buffer), rms);
   }
 
-  /**
-   * Gateway'den gelen ham ses (PCM) parçalarını hoparlörde çalar. (Jitter Buffer)
-   */
   public playChunk(pcmData: Uint8Array): void {
     if (!this.audioContext) return;
 
@@ -143,21 +133,17 @@ export class SentiricAudioManager {
     source.start(this.nextStartTime);
     this.nextStartTime += audioBuffer.duration;
 
-    // Aktif node'ları izle (Barge-in anında susturmak için)
     this.activeSourceNodes.push(source);
     source.onended = () => {
       this.activeSourceNodes = this.activeSourceNodes.filter(n => n !== source);
     };
   }
 
-  /**
-   * Zero-Latency Barge-in: Çalmakta olan ve sıradaki tüm AI ses tamponlarını boşaltır.
-   */
   public flushPlayback(): void {
     if (this.activeSourceNodes.length > 0) {
       Logger.info("AUDIO_FLUSH", `Flushing ${this.activeSourceNodes.length} active audio nodes.`);
       this.activeSourceNodes.forEach(node => {
-        try { node.stop(); } catch (e) {} // Zaten bittiyse hatayı yut
+        try { node.stop(); } catch (e) {} 
       });
       this.activeSourceNodes = [];
     }
@@ -172,6 +158,7 @@ export class SentiricAudioManager {
     this.audioContext?.close();
     this.audioContext = null;
     this.isSpeaking = false;
+    this.speechFramesCount = 0;
     Logger.info("MIC_STOPPED", "Audio engine stopped cleanly.");
   }
 }
