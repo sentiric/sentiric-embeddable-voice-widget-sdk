@@ -7,13 +7,15 @@ import { Logger } from '../utils/logger';
 export interface StreamClientOptions {
   gatewayUrl: string;
   tenantId: string;
-  traceId?: string;   // Host uygulama verebilir
-  sessionId?: string; // Host uygulama verebilir
+  traceId?: string;
+  sessionId?: string;
   token?: string;
   language?: string;
   sampleRate?: number;
   edgeMode?: boolean;
   onAudioReceived?: (chunk: Uint8Array) => void;
+  // [YENİ]: UI tarafında dinlenecek Transcript olayı
+  onTranscript?: (data: any) => void;
   onError?: (error: any) => void;
   onClose?: () => void;
 }
@@ -34,7 +36,6 @@ export class SentiricStreamClient {
   private RequestType: any = null;
   private ResponseType: any = null;
 
-  // Resilience (Dayanıklılık) State
   private isIntentionallyStopped: boolean = false;
   private retryCount: number = 0;
   private readonly maxRetries: number = 5;
@@ -54,7 +55,6 @@ export class SentiricStreamClient {
       ...options,
     };
     
-    // SUTS v4.0 Bağlamını Kur
     Logger.setContext(this.options.tenantId, this.traceId, this.sessionId);
   }
 
@@ -64,14 +64,13 @@ export class SentiricStreamClient {
 
     await this.initProtobuf();
     
-    // Mikrofon ve VAD Engine'i bir kez başlatıyoruz. Bağlantı kopsa bile mikrofon açık kalır.
     this.audioManager = new SentiricAudioManager(
       (chunk) => this.sendAudio(chunk), 
       () => this.sendInterruptSignal(), 
       this.options.sampleRate
     );
 
-    await this.connect(true); // isInitial = true
+    await this.connect(true);
     await this.audioManager.startMicrophone();
     
     Logger.info("SESSION_ACTIVE", "Sentiric AI Session started successfully.");
@@ -107,7 +106,6 @@ export class SentiricStreamClient {
                         language: { id: 2, type: "string" },
                         sampleRate: { id: 3, type: "uint32" },
                         edgeMode: { id: 4, type: "bool" }
-                        // Not: Gelecekte protobuf güncellendiğinde sessionId ve traceId buraya eklenecek.
                       }
                     },
                     SessionControl: {
@@ -118,12 +116,25 @@ export class SentiricStreamClient {
                         }
                       }
                     },
+                    // [YENİ] TranscriptEvent tanımı eklendi
+                    TranscriptEvent: {
+                      fields: {
+                        text: { id: 1, type: "string" },
+                        is_final: { id: 2, type: "bool" },
+                        sender: { id: 3, type: "string" },
+                        emotion: { id: 4, type: "string" },
+                        gender: { id: 5, type: "string" }
+                      }
+                    },
+                    // [YENİ] clearAudioBuffer ve transcript alanları eklendi
                     StreamSessionResponse: {
-                      oneofs: { data: { oneof: ["audioResponse", "textResponse", "statusUpdate"] } },
+                      oneofs: { data: { oneof: ["audioResponse", "textResponse", "statusUpdate", "transcript", "clearAudioBuffer"] } },
                       fields: {
                         audioResponse: { id: 1, type: "bytes" },
                         textResponse: { id: 2, type: "string" },
-                        statusUpdate: { id: 3, type: "string" }
+                        statusUpdate: { id: 3, type: "string" },
+                        transcript: { id: 4, type: "TranscriptEvent" },
+                        clearAudioBuffer: { id: 5, type: "bool" }
                       }
                     }
                   }
@@ -139,9 +150,6 @@ export class SentiricStreamClient {
     this.ResponseType = root.lookupType("sentiric.stream.v1.StreamSessionResponse");
   }
 
-  /**
-   * Exponential Backoff ile ağ bağlantısını kurar ve korur.
-   */
   private async connect(isInitial: boolean = false): Promise<void> {
     return new Promise((resolve, reject) => {
       const attempt = () => {
@@ -151,9 +159,9 @@ export class SentiricStreamClient {
 
         this.ws.onopen = () => {
           Logger.info("WS_CONNECTED", "WebSocket connection established.");
-          this.retryCount = 0; // Bağlantı başarılı, sayacı sıfırla
+          this.retryCount = 0;
           this.isReady = true;
-          this.sendSessionConfig(); // Reconnect durumunda session'ı (Resumption) sunucuya hatırlat
+          this.sendSessionConfig();
           resolve();
         };
 
@@ -173,7 +181,6 @@ export class SentiricStreamClient {
 
           if (this.retryCount < this.maxRetries) {
             this.retryCount++;
-            // Üstel bekleme (Exponential Backoff): 1s, 2s, 4s, 8s, 16s (Max 30s)
             const backoffMs = Math.min(30000, 1000 * Math.pow(2, this.retryCount - 1));
             Logger.warn("WS_RECONNECTING", `Connection lost. Retrying in ${backoffMs}ms...`, { attempt: this.retryCount });
             setTimeout(attempt, backoffMs);
@@ -227,12 +234,22 @@ export class SentiricStreamClient {
     if (!this.ResponseType) return;
     try {
       const message = this.ResponseType.decode(new Uint8Array(data));
+      
       if (message.audioResponse) {
-        this.audioManager?.playChunk(message.audioResponse);
-        if (this.options.onAudioReceived) this.options.onAudioReceived(message.audioResponse);
+        // [CRITICAL FIX]: 0-byte uzunluğundaki paketlerde DOMException fırlatmasını engeller
+        if (message.audioResponse.length > 0) {
+            this.audioManager?.playChunk(message.audioResponse);
+            if (this.options.onAudioReceived) this.options.onAudioReceived(message.audioResponse);
+        }
       } 
+      else if (message.clearAudioBuffer) {
+        this.audioManager?.flushPlayback();
+      }
+      else if (message.transcript) {
+        if (this.options.onTranscript) this.options.onTranscript(message.transcript);
+      }
       else if (message.textResponse) {
-        // AI'dan gelen metinler (Gelecekte UI'a aktarılacak)
+        // Legacy metin yanıtı (kullanılmıyor, ancak kırılmaması için tutuldu)
       }
     } catch (e) {
       Logger.error("WS_DECODE_ERROR", "Failed to decode incoming Protobuf message", { error: e });
