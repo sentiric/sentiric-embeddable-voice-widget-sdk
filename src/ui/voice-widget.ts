@@ -83,7 +83,6 @@ export class SentiricVoiceWidget extends HTMLElement {
     const msgClass = data.sender === 'USER' ? 'user' : 'ai';
     const activeMsgId = `msg-${msgClass}-active`;
     
-    // TYPECAST: HTMLElement | null olarak belirtiyoruz ki innerText kullanabilelim
     let msgEl = this.transcriptBox.querySelector(`#${activeMsgId}`) as HTMLElement | null;
     
     if (!msgEl) {
@@ -95,14 +94,21 @@ export class SentiricVoiceWidget extends HTMLElement {
 
     msgEl.innerText = data.text;
 
-    if (data.is_final) {
+    // [CRITICAL FIX]: Protobuf.js snake_case'i camelCase'e çevirir. İki ihtimali de destekle.
+    const isFinal = data.isFinal !== undefined ? data.isFinal : data.is_final;
+
+    if (isFinal) {
         msgEl.removeAttribute('id');
         msgEl.classList.remove('partial');
     } else {
         msgEl.classList.add('partial');
     }
 
-    this.transcriptBox.scrollTop = this.transcriptBox.scrollHeight;
+    // Scroll'u pürüzsüzce en alta kaydır
+    this.transcriptBox.scrollTo({
+      top: this.transcriptBox.scrollHeight,
+      behavior: 'smooth'
+    });
   }
 
   private updateUI() {
