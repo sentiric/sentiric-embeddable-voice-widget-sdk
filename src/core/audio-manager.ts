@@ -1,14 +1,14 @@
 // [ARCH-COMPLIANCE] sentiric-stream-sdk/src/core/audio-manager.ts
 // NİHAİ SÜRÜM: Dinamik VAD ve Elastik Zamanlayıcı
-import { AUDIO_WORKLET_CODE } from './audio-processor-worklet';
-import { Logger } from '../utils/logger';
+import { AUDIO_WORKLET_CODE } from "./audio-processor-worklet";
+import { Logger } from "../utils/logger";
 
 export class SentiricAudioManager {
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
   private workletNode: AudioWorkletNode | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
-  
+
   private nextStartTime: number = 0;
   private activeSourceNodes: AudioBufferSourceNode[] = [];
 
@@ -17,17 +17,17 @@ export class SentiricAudioManager {
   private readonly BASE_PAUSE_TIME = 1500;
   private isAiSpeaking: boolean = false;
 
-  public vadThreshold: number = 0.025; 
-  public vadPauseTime: number = 1500; 
+  public vadThreshold: number = 0.025;
+  public vadPauseTime: number = 1500;
   private isSpeaking: boolean = false;
   private lastSpkTime: number = 0;
   private speechFramesCount: number = 0;
-  private readonly SPEECH_FRAMES_REQUIRED: number = 15; 
+  private readonly SPEECH_FRAMES_REQUIRED: number = 15;
 
   constructor(
     private onAudioData: (data: Uint8Array) => void,
     private onInterrupt: () => void,
-    private sampleRate: number = 24000
+    private sampleRate: number = 24000,
   ) {}
 
   /**
@@ -50,25 +50,38 @@ export class SentiricAudioManager {
    */
   public setElasticMode(isUserThinking: boolean) {
     if (!this.isAiSpeaking) {
-        this.vadPauseTime = isUserThinking ? 2800 : 1200;
+      this.vadPauseTime = isUserThinking ? 2800 : 1200;
     }
   }
 
   public async startMicrophone(): Promise<void> {
     try {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
 
-      if (!this.audioContext) this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
-      if (this.audioContext.state === 'suspended') await this.audioContext.resume();
+      if (!this.audioContext)
+        this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
+      if (this.audioContext.state === "suspended")
+        await this.audioContext.resume();
 
-      const blob = new Blob([AUDIO_WORKLET_CODE], { type: 'application/javascript' });
+      const blob = new Blob([AUDIO_WORKLET_CODE], {
+        type: "application/javascript",
+      });
       const url = URL.createObjectURL(blob);
       await this.audioContext.audioWorklet.addModule(url);
 
-      this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
-      this.workletNode = new AudioWorkletNode(this.audioContext, 'sentiric-audio-processor');
+      this.sourceNode = this.audioContext.createMediaStreamSource(
+        this.mediaStream,
+      );
+      this.workletNode = new AudioWorkletNode(
+        this.audioContext,
+        "sentiric-audio-processor",
+      );
 
       this.workletNode.port.onmessage = (event) => {
         const { pcmData, rms } = event.data;
@@ -87,19 +100,29 @@ export class SentiricAudioManager {
     if (rms > this.vadThreshold) {
       this.lastSpkTime = Date.now();
       this.speechFramesCount++;
-      
-      if (!this.isSpeaking && this.speechFramesCount >= this.SPEECH_FRAMES_REQUIRED) {
+
+      if (
+        !this.isSpeaking &&
+        this.speechFramesCount >= this.SPEECH_FRAMES_REQUIRED
+      ) {
         this.isSpeaking = true;
-        Logger.info("VAD_SPEECH_START", "Speech detected. Mode: " + (this.isAiSpeaking ? "Barge-in" : "Normal"));
+        Logger.info(
+          "VAD_SPEECH_START",
+          "Speech detected. Mode: " +
+            (this.isAiSpeaking ? "Barge-in" : "Normal"),
+        );
         if (this.isAiSpeaking) {
-            this.flushPlayback(); 
+          this.flushPlayback();
         }
-        this.onInterrupt();   
+        this.onInterrupt();
       }
       this.onAudioData(pcmBytes);
     } else {
       this.speechFramesCount = 0;
-      if (this.isSpeaking && (Date.now() - this.lastSpkTime > this.vadPauseTime)) {
+      if (
+        this.isSpeaking &&
+        Date.now() - this.lastSpkTime > this.vadPauseTime
+      ) {
         this.isSpeaking = false;
         Logger.info("VAD_SPEECH_STOP", "User silent. Waiting for AI response.");
       }
@@ -113,44 +136,61 @@ export class SentiricAudioManager {
     if (!this.audioContext || pcmData.length === 0) return;
 
     try {
-        const safeLength = Math.floor(pcmData.byteLength / 2) * 2;
-        const alignedBuffer = pcmData.byteLength === safeLength ? pcmData : pcmData.slice(0, safeLength);
-        
-        const int16Buffer = new Int16Array(alignedBuffer.buffer, alignedBuffer.byteOffset, alignedBuffer.byteLength / 2);
-        const float32Buffer = new Float32Array(int16Buffer.length);
+      const safeLength = Math.floor(pcmData.byteLength / 2) * 2;
+      const alignedBuffer =
+        pcmData.byteLength === safeLength
+          ? pcmData
+          : pcmData.slice(0, safeLength);
 
-        for (let i = 0; i < int16Buffer.length; i++) {
-            float32Buffer[i] = int16Buffer[i] / 32768.0;
+      const int16Buffer = new Int16Array(
+        alignedBuffer.buffer,
+        alignedBuffer.byteOffset,
+        alignedBuffer.byteLength / 2,
+      );
+      const float32Buffer = new Float32Array(int16Buffer.length);
+
+      for (let i = 0; i < int16Buffer.length; i++) {
+        float32Buffer[i] = int16Buffer[i] / 32768.0;
+      }
+
+      const audioBuffer = this.audioContext.createBuffer(
+        1,
+        float32Buffer.length,
+        this.sampleRate,
+      );
+      audioBuffer.getChannelData(0).set(float32Buffer);
+
+      const source = this.audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.audioContext.destination);
+
+      const currentTime = this.audioContext.currentTime;
+      if (this.nextStartTime < currentTime) this.nextStartTime = currentTime;
+
+      source.start(this.nextStartTime);
+      this.nextStartTime += audioBuffer.duration;
+
+      this.activeSourceNodes.push(source);
+      source.onended = () => {
+        this.activeSourceNodes = this.activeSourceNodes.filter(
+          (n) => n !== source,
+        );
+        // Eğer çalınacak başka paket kalmadıysa AI sustu demektir
+        if (this.activeSourceNodes.length === 0) {
+          this.setAiSpeaking(false);
         }
-
-        const audioBuffer = this.audioContext.createBuffer(1, float32Buffer.length, this.sampleRate);
-        audioBuffer.getChannelData(0).set(float32Buffer);
-
-        const source = this.audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(this.audioContext.destination);
-
-        const currentTime = this.audioContext.currentTime;
-        if (this.nextStartTime < currentTime) this.nextStartTime = currentTime;
-
-        source.start(this.nextStartTime);
-        this.nextStartTime += audioBuffer.duration;
-
-        this.activeSourceNodes.push(source);
-        source.onended = () => {
-            this.activeSourceNodes = this.activeSourceNodes.filter(n => n !== source);
-            // Eğer çalınacak başka paket kalmadıysa AI sustu demektir
-            if (this.activeSourceNodes.length === 0) {
-                this.setAiSpeaking(false);
-            }
-        };
+      };
     } catch (e) {
-        console.warn("Playback error:", e);
+      console.warn("Playback error:", e);
     }
   }
 
   public flushPlayback(): void {
-    this.activeSourceNodes.forEach(node => { try { node.stop(); } catch (e) {} });
+    this.activeSourceNodes.forEach((node) => {
+      try {
+        node.stop();
+      } catch (e) {}
+    });
     this.activeSourceNodes = [];
     this.nextStartTime = this.audioContext ? this.audioContext.currentTime : 0;
     this.setAiSpeaking(false);

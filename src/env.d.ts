@@ -1,13 +1,13 @@
 // env.d.ts
 
 // Vite'in ?raw ekiyle import edilen dosyaların string olduğunu bildirir
-declare module '*?raw' {
+declare module "*?raw" {
   const content: string;
   export default content;
 }
 
 // Vite'in ?inline ekiyle import edilen CSS dosyalarının string olduğunu bildirir
-declare module '*?inline' {
+declare module "*?inline" {
   const content: string;
   export default content;
 }
