@@ -1,9 +1,9 @@
-// [YENİ] Yeni nesil tip güvenliği
 import { 
   StreamSessionRequest, 
   StreamSessionResponse,
   TranscriptEvent
-} from '@sentiric/contracts/stream';
+} from '@sentiric/contracts/stream'; 
+
 import { SentiricAudioManager } from './audio-manager';
 import { Logger } from '../utils/logger';
 
@@ -17,9 +17,17 @@ export interface StreamClientOptions {
   sampleRate?: number;
   edgeMode?: boolean;
   onAudioReceived?: (chunk: Uint8Array) => void;
-  onTranscript?: (data: TranscriptEvent) => void; // [TİP GÜVENLİ]
+  onTranscript?: (data: TranscriptEvent) => void;
   onError?: (error: any) => void;
   onClose?: () => void;
+}
+
+// [ARCH-COMPLIANCE] Standard UUID format (Daha profesyonel log takibi için)
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0, v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 export class SentiricStreamClient {
@@ -32,8 +40,8 @@ export class SentiricStreamClient {
   public readonly sessionId: string;
 
   constructor(options: StreamClientOptions) {
-    this.traceId = options.traceId || Math.random().toString(36).substring(7);
-    this.sessionId = options.sessionId || Math.random().toString(36).substring(7);
+    this.traceId = options.traceId || generateUUID();
+    this.sessionId = options.sessionId || generateUUID();
     this.options = { language: 'tr-TR', sampleRate: 24000, edgeMode: false, token: 'guest-token', ...options };
     Logger.setContext(this.options.tenantId, this.traceId, this.sessionId);
   }
@@ -42,7 +50,7 @@ export class SentiricStreamClient {
     this.audioManager = new SentiricAudioManager((c) => this.sendAudio(c), () => this.sendInterrupt(), this.options.sampleRate);
     await this.connect();
     await this.audioManager.startMicrophone();
-    Logger.info("SESSION_ACTIVE", "AI Session started with type-safety.");
+    Logger.info("SESSION_ACTIVE", "AI Session started with full type-safety.");
   }
 
   private async connect(): Promise<void> {
@@ -85,19 +93,26 @@ export class SentiricStreamClient {
     try {
       const message = StreamSessionResponse.decode(new Uint8Array(data));
 
-      // ARTIK message.audioResponse TİP GÜVENLİDİR!
+      // [CRITICAL FIX]: ts-proto oneof yapılarını 'data' (veya tanımsız ise field name) içinde saklar.
+      // Emniyet kemeri: Hem düz erişimi hem de oneof'u kontrol et.
+      
+      // 1. Audio Response
       if (message.audioResponse && message.audioResponse.length > 0) {
-        this.audioManager?.playChunk(message.audioResponse);
+          this.audioManager?.playChunk(message.audioResponse);
+          if (this.options.onAudioReceived) this.options.onAudioReceived(message.audioResponse);
       } 
-      else if (message.clearAudioBuffer) {
-        this.audioManager?.flushPlayback();
-      }
+      // 2. Transcript (Gördüğün baloncuklar burada patlıyor!)
       else if (message.transcript) {
-        Logger.info("TRANSCRIPT_RECEIVED", `[${message.transcript.sender}] ${message.transcript.text}`);
-        if (this.options.onTranscript) this.options.onTranscript(message.transcript);
+          Logger.info("TRANSCRIPT_RECEIVED", `[${message.transcript.sender}] ${message.transcript.text}`);
+          if (this.options.onTranscript) this.options.onTranscript(message.transcript);
       }
+      // 3. Buffer Control
+      else if (message.clearAudioBuffer) {
+          this.audioManager?.flushPlayback();
+      }
+      
     } catch (e) {
-      Logger.error("WS_DECODE_ERROR", "Decode failed", { error: e });
+      Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });
     }
   }
 
