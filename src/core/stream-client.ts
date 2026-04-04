@@ -1,8 +1,8 @@
-import { 
-  StreamSessionRequest, 
+import {
+  StreamSessionRequest,
   StreamSessionResponse,
   TranscriptEvent
-} from '@sentiric/contracts/stream'; 
+} from '@sentiric/contracts/stream';
 
 import { SentiricAudioManager } from './audio-manager';
 import { Logger } from '../utils/logger';
@@ -35,7 +35,7 @@ export class SentiricStreamClient {
   private options: StreamClientOptions;
   private isReady: boolean = false;
   private audioManager: SentiricAudioManager | null = null;
-  
+
   public readonly traceId: string;
   public readonly sessionId: string;
 
@@ -57,8 +57,8 @@ export class SentiricStreamClient {
     return new Promise((resolve) => {
       this.ws = new WebSocket(this.options.gatewayUrl);
       this.ws.binaryType = 'arraybuffer';
-      this.ws.onopen = () => { 
-        this.isReady = true; 
+      this.ws.onopen = () => {
+        this.isReady = true;
         const configReq = StreamSessionRequest.fromPartial({
           config: {
             token: this.options.token!,
@@ -70,7 +70,7 @@ export class SentiricStreamClient {
           }
         });
         this.ws?.send(StreamSessionRequest.encode(configReq).finish());
-        resolve(); 
+        resolve();
       };
       this.ws.onmessage = (e) => this.handleMessage(e.data);
       this.ws.onclose = () => { if (this.isReady) setTimeout(() => this.connect(), 2000); };
@@ -93,26 +93,24 @@ export class SentiricStreamClient {
     try {
       const message = StreamSessionResponse.decode(new Uint8Array(data));
 
-      // [CRITICAL FIX]: ts-proto oneof yapılarını 'data' (veya tanımsız ise field name) içinde saklar.
-      // Emniyet kemeri: Hem düz erişimi hem de oneof'u kontrol et.
-      
-      // 1. Audio Response
       if (message.audioResponse && message.audioResponse.length > 0) {
-          this.audioManager?.playChunk(message.audioResponse);
-          if (this.options.onAudioReceived) this.options.onAudioReceived(message.audioResponse);
-      } 
-      // 2. Transcript (Gördüğün baloncuklar burada patlıyor!)
+        this.audioManager?.playChunk(message.audioResponse);
+      }
       else if (message.transcript) {
-          Logger.info("TRANSCRIPT_RECEIVED", `[${message.transcript.sender}] ${message.transcript.text}`);
-          if (this.options.onTranscript) this.options.onTranscript(message.transcript);
+        // [DEBUG LOG]: Duygu datası geliyor mu kontrol et
+        console.log("🔍 AFFECTIVE DEBUG:", {
+          gender: message.transcript.gender,
+          emotion: message.transcript.emotion
+        });
+
+        Logger.info("TRANSCRIPT_RECEIVED", `[${message.transcript.sender}] ${message.transcript.text}`);
+        if (this.options.onTranscript) this.options.onTranscript(message.transcript);
       }
-      // 3. Buffer Control
       else if (message.clearAudioBuffer) {
-          this.audioManager?.flushPlayback();
+        this.audioManager?.flushPlayback();
       }
-      
     } catch (e) {
-      Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });
+      Logger.error("WS_DECODE_ERROR", "Decode fail", { error: e });
     }
   }
 
