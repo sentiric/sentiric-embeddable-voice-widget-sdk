@@ -7,17 +7,14 @@ export class SentiricAudioManager {
   private workletNode: AudioWorkletNode | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   
-  // Playback State
   private nextStartTime: number = 0;
   private activeSourceNodes: AudioBufferSourceNode[] = [];
 
-  // VAD (Voice Activity Detection) State
-  public vadThreshold: number = 0.015; // [CRITICAL FIX]: 0.010'dan 0.015'e çıkarıldı (Arka plan gürültüsü için)
-  public vadPauseTime: number = 1500; // ms
+  public vadThreshold: number = 0.015; 
+  public vadPauseTime: number = 1500; 
   private isSpeaking: boolean = false;
   private lastSpkTime: number = 0;
   
-  // [CRITICAL FIX]: Ani patlamaları (nefes, tıkırtı) "Söz Kesme" saymamak için debouncer eklendi.
   private speechFramesCount: number = 0;
   private readonly SPEECH_FRAMES_REQUIRED: number = 5; 
 
@@ -30,20 +27,11 @@ export class SentiricAudioManager {
   public async startMicrophone(): Promise<void> {
     try {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
 
-      if (!this.audioContext) {
-        this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
-      }
-
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
+      if (!this.audioContext) this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
+      if (this.audioContext.state === 'suspended') await this.audioContext.resume();
 
       const blob = new Blob([AUDIO_WORKLET_CODE], { type: 'application/javascript' });
       const url = URL.createObjectURL(blob);
@@ -68,30 +56,21 @@ export class SentiricAudioManager {
   private handleVadAndEmit(pcmBytes: Uint8Array, rms: number) {
     if (rms > this.vadThreshold) {
       this.lastSpkTime = Date.now();
-      
-      // [CRITICAL FIX]: Anında tetiklemek yerine çerçeve (frame) sayıyoruz.
       this.speechFramesCount++;
       
-    if (!this.isSpeaking && this.speechFramesCount >= this.SPEECH_FRAMES_REQUIRED) {
+      if (!this.isSpeaking && this.speechFramesCount >= this.SPEECH_FRAMES_REQUIRED) {
         this.isSpeaking = true;
-        Logger.info("VAD_SPEECH_START", "Valid speech detected."); // Log mesajını değiştirdik
+        Logger.info("VAD_SPEECH_START", "Valid speech detected. Triggering Barge-in!");
         this.flushPlayback(); 
-        
-        // [CRITICAL TEST FIX]: LLM yavaş yanıt verdiği için, bekleme sırasındaki 
-        // nefes seslerimiz AI'ı iptal etmesin diye Barge-in sinyalini GEÇİCİ olarak kapattık.
-        // this.onInterrupt();   <--- BURAYI YORUMA AL
+        this.onInterrupt();   
       }
-      
       this.onAudioData(pcmBytes);
     } else {
-      // Ses kesildiğinde frame sayacını sıfırla (Anlık patlamaları elemek için)
       this.speechFramesCount = 0;
-
       if (this.isSpeaking && (Date.now() - this.lastSpkTime > this.vadPauseTime)) {
         this.isSpeaking = false;
         Logger.info("VAD_SPEECH_STOP", "Silence detected. Pausing audio transmission.");
       }
-
       if (this.isSpeaking) {
         this.onAudioData(pcmBytes);
       }
@@ -112,9 +91,12 @@ export class SentiricAudioManager {
   }
 
   public playChunk(pcmData: Uint8Array): void {
-    if (!this.audioContext) return;
+    if (!this.audioContext || pcmData.length === 0) return;
 
-    const int16Buffer = new Int16Array(pcmData.buffer);
+    // [CRITICAL FIX]: TypedArray bellek sızıntısını ve RangeError'ı önler.
+    // Sadece Uint8Array'in ait olduğu byteOffset ve length'i okuruz!
+    const int16Length = Math.floor(pcmData.byteLength / 2);
+    const int16Buffer = new Int16Array(pcmData.buffer, pcmData.byteOffset, int16Length);
     const float32Buffer = new Float32Array(int16Buffer.length);
 
     for (let i = 0; i < int16Buffer.length; i++) {

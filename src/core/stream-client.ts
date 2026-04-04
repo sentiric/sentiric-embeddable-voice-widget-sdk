@@ -24,6 +24,59 @@ function generateUUID() {
   });
 }
 
+// [CRITICAL FIX]: Rust (Backend) ile %100 aynı proto şemasını metin olarak tanımlıyoruz. 
+// Bu sayede JSON tip hatalarından (RangeError) tamamen kurtuluyoruz.
+const PROTO_DEF = `
+syntax = "proto3";
+package sentiric.stream.v1;
+
+message StreamSessionRequest {
+  oneof data {
+    SessionConfig config = 1;
+    bytes audio_chunk = 2;
+    string text_message = 3;
+    SessionControl control = 4;
+  }
+}
+
+message StreamSessionResponse {
+  oneof data {
+    bytes audio_response = 1;
+    string text_response = 2;
+    string status_update = 3;
+    TranscriptEvent transcript = 4;
+    bool clear_audio_buffer = 5;
+  }
+}
+
+message TranscriptEvent {
+  string text = 1;
+  bool is_final = 2;
+  string sender = 3;
+  string emotion = 4;
+  string gender = 5;
+}
+
+message SessionConfig {
+  string token = 1;
+  string language = 2;
+  uint32 sample_rate = 3;
+  bool edge_mode = 4;
+  string trace_id = 5;
+  string session_id = 6;
+}
+
+message SessionControl {
+  enum EventType {
+    EVENT_TYPE_UNSPECIFIED = 0;
+    EVENT_TYPE_INTERRUPT = 1;
+    EVENT_TYPE_EOS = 2;
+    EVENT_TYPE_HANGUP = 3;
+  }
+  EventType event = 1;
+}
+`;
+
 export class SentiricStreamClient {
   private ws: WebSocket | null = null;
   private options: StreamClientOptions;
@@ -80,68 +133,7 @@ export class SentiricStreamClient {
   }
 
   private async initProtobuf() {
-    // [CRITICAL FIX]: camelCase eşleşme hatasını önlemek için TAM OLARAK .proto formatı (snake_case) kullanıldı.
-    const root = protobuf.Root.fromJSON({
-      nested: {
-        sentiric: {
-          nested: {
-            stream: {
-              nested: {
-                v1: {
-                  nested: {
-                    StreamSessionRequest: {
-                      fields: {
-                        config: { id: 1, type: "SessionConfig" },
-                        audio_chunk: { id: 2, type: "bytes" },
-                        text_message: { id: 3, type: "string" },
-                        control: { id: 4, type: "SessionControl" }
-                      }
-                    },
-                    SessionConfig: {
-                      fields: {
-                        token: { id: 1, type: "string" },
-                        language: { id: 2, type: "string" },
-                        sample_rate: { id: 3, type: "uint32" },
-                        edge_mode: { id: 4, type: "bool" },
-                        trace_id: { id: 5, type: "string" },
-                        session_id: { id: 6, type: "string" }
-                      }
-                    },
-                    SessionControl: {
-                      fields: { event: { id: 1, type: "EventType" } },
-                      nested: {
-                        EventType: {
-                          values: { EVENT_TYPE_UNSPECIFIED: 0, EVENT_TYPE_INTERRUPT: 1, EVENT_TYPE_EOS: 2, EVENT_TYPE_HANGUP: 3 }
-                        }
-                      }
-                    },
-                    TranscriptEvent: {
-                      fields: {
-                        text: { id: 1, type: "string" },
-                        is_final: { id: 2, type: "bool" },
-                        sender: { id: 3, type: "string" },
-                        emotion: { id: 4, type: "string" },
-                        gender: { id: 5, type: "string" }
-                      }
-                    },
-                    StreamSessionResponse: {
-                      fields: {
-                        audio_response: { id: 1, type: "bytes" },
-                        text_response: { id: 2, type: "string" },
-                        status_update: { id: 3, type: "string" },
-                        transcript: { id: 4, type: "TranscriptEvent" },
-                        clear_audio_buffer: { id: 5, type: "bool" }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
+    const root = protobuf.parse(PROTO_DEF).root;
     this.RequestType = root.lookupType("sentiric.stream.v1.StreamSessionRequest");
     this.ResponseType = root.lookupType("sentiric.stream.v1.StreamSessionResponse");
   }
@@ -239,21 +231,7 @@ export class SentiricStreamClient {
         if (this.options.onTranscript) this.options.onTranscript(message.transcript);
       }
     } catch (e) {
-      // [CRITICAL FALLBACK]: Kütüphane çökse bile sesi çal!
-      Logger.warn("WS_DECODE_ERROR", "Protobuf decode failed, attempting manual rescue...", { error: e });
-      const arr = new Uint8Array(data);
-      // Tag 1 (audio_response) = 0x0A
-      if (arr[0] === 0x0A) {
-         let offset = 1; let len = 0; let shift = 0;
-         while (offset < arr.length) {
-             const b = arr[offset++];
-             len |= (b & 0x7f) << shift;
-             if ((b & 0x80) === 0) break;
-             shift += 7;
-         }
-         const audioData = arr.subarray(offset, offset + len);
-         if (audioData.length > 0) this.audioManager?.playChunk(audioData);
-      }
+      Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });
     }
   }
 
