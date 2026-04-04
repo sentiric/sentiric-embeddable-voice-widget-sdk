@@ -1,5 +1,3 @@
-// File: src/core/stream-client.ts
-
 import protobuf from 'protobufjs';
 import { SentiricAudioManager } from './audio-manager';
 import { Logger } from '../utils/logger';
@@ -14,7 +12,6 @@ export interface StreamClientOptions {
   sampleRate?: number;
   edgeMode?: boolean;
   onAudioReceived?: (chunk: Uint8Array) => void;
-  // [YENİ]: UI tarafında dinlenecek Transcript olayı
   onTranscript?: (data: any) => void;
   onError?: (error: any) => void;
   onClose?: () => void;
@@ -83,6 +80,7 @@ export class SentiricStreamClient {
   }
 
   private async initProtobuf() {
+    // [CRITICAL FIX]: camelCase eşleşme hatasını önlemek için TAM OLARAK .proto formatı (snake_case) kullanıldı.
     const root = protobuf.Root.fromJSON({
       nested: {
         sentiric: {
@@ -92,11 +90,10 @@ export class SentiricStreamClient {
                 v1: {
                   nested: {
                     StreamSessionRequest: {
-                      oneofs: { data: { oneof: ["config", "audioChunk", "textMessage", "control"] } },
                       fields: {
                         config: { id: 1, type: "SessionConfig" },
-                        audioChunk: { id: 2, type: "bytes" },
-                        textMessage: { id: 3, type: "string" },
+                        audio_chunk: { id: 2, type: "bytes" },
+                        text_message: { id: 3, type: "string" },
                         control: { id: 4, type: "SessionControl" }
                       }
                     },
@@ -104,10 +101,10 @@ export class SentiricStreamClient {
                       fields: {
                         token: { id: 1, type: "string" },
                         language: { id: 2, type: "string" },
-                        sampleRate: { id: 3, type: "uint32" },
-                        edgeMode: { id: 4, type: "bool" },
-                        trace_id: { id: 5, type: "string" },   // [YENİ]
-                        session_id: { id: 6, type: "string" }  // [YENİ]
+                        sample_rate: { id: 3, type: "uint32" },
+                        edge_mode: { id: 4, type: "bool" },
+                        trace_id: { id: 5, type: "string" },
+                        session_id: { id: 6, type: "string" }
                       }
                     },
                     SessionControl: {
@@ -118,7 +115,6 @@ export class SentiricStreamClient {
                         }
                       }
                     },
-                    // [YENİ] TranscriptEvent tanımı eklendi
                     TranscriptEvent: {
                       fields: {
                         text: { id: 1, type: "string" },
@@ -128,15 +124,13 @@ export class SentiricStreamClient {
                         gender: { id: 5, type: "string" }
                       }
                     },
-                    // [YENİ] clearAudioBuffer ve transcript alanları eklendi
                     StreamSessionResponse: {
-                      oneofs: { data: { oneof: ["audioResponse", "textResponse", "statusUpdate", "transcript", "clearAudioBuffer"] } },
                       fields: {
-                        audioResponse: { id: 1, type: "bytes" },
-                        textResponse: { id: 2, type: "string" },
-                        statusUpdate: { id: 3, type: "string" },
+                        audio_response: { id: 1, type: "bytes" },
+                        text_response: { id: 2, type: "string" },
+                        status_update: { id: 3, type: "string" },
                         transcript: { id: 4, type: "TranscriptEvent" },
-                        clearAudioBuffer: { id: 5, type: "bool" }
+                        clear_audio_buffer: { id: 5, type: "bool" }
                       }
                     }
                   }
@@ -175,12 +169,10 @@ export class SentiricStreamClient {
         
         this.ws.onclose = () => {
           this.isReady = false;
-          
           if (this.isIntentionallyStopped) {
             Logger.info("WS_CLOSED", "Connection closed intentionally.");
             return;
           }
-
           if (this.retryCount < this.maxRetries) {
             this.retryCount++;
             const backoffMs = Math.min(30000, 1000 * Math.pow(2, this.retryCount - 1));
@@ -189,78 +181,79 @@ export class SentiricStreamClient {
           } else {
             Logger.error("WS_DISCONNECTED_FATAL", "Max reconnection attempts reached. Session dead.");
             this.audioManager?.stop();
-            if (isInitial) reject(new Error("Failed to connect to gateway after multiple attempts"));
+            if (isInitial) reject(new Error("Failed to connect to gateway"));
             if (this.options.onError) this.options.onError(new Error("Connection lost permanently"));
             if (this.options.onClose) this.options.onClose();
           }
         };
       };
-
       attempt();
     });
   }
 
-  // sendSessionConfig metodunu güncelleyin:
   private sendSessionConfig() {
     if (!this.ws || !this.RequestType) return;
-    const configPayload = {
+    const message = this.RequestType.create({
       config: {
         token: this.options.token,
         language: this.options.language,
-        sampleRate: this.options.sampleRate,
-        edgeMode: this.options.edgeMode,
-        trace_id: this.traceId,     // [ARCH-COMPLIANCE] Bağlam Koruması
-        session_id: this.sessionId  // [ARCH-COMPLIANCE] Bağlam Koruması
+        sample_rate: this.options.sampleRate,
+        edge_mode: this.options.edgeMode,
+        trace_id: this.traceId,
+        session_id: this.sessionId
       }
-    };
-    const message = this.RequestType.create(configPayload);
-    const buffer = this.RequestType.encode(message).finish();
-    this.ws.send(buffer);
+    });
+    this.ws.send(this.RequestType.encode(message).finish());
   }
 
   private sendInterruptSignal() {
     if (!this.isReady || !this.ws || !this.RequestType) return;
-    const controlPayload = { control: { event: 1 } };
-    const message = this.RequestType.create(controlPayload);
-    const buffer = this.RequestType.encode(message).finish();
-    this.ws.send(buffer);
+    const message = this.RequestType.create({ control: { event: 1 } });
+    this.ws.send(this.RequestType.encode(message).finish());
     Logger.info("SIGNAL_SENT", "EVENT_TYPE_INTERRUPT sent to Gateway.");
   }
 
   private sendAudio(chunk: Uint8Array) {
     if (!this.isReady || !this.ws || !this.RequestType) return;
-    const audioPayload = { audioChunk: chunk };
-    const message = this.RequestType.create(audioPayload);
-    const buffer = this.RequestType.encode(message).finish();
-    this.ws.send(buffer);
+    const message = this.RequestType.create({ audio_chunk: chunk });
+    this.ws.send(this.RequestType.encode(message).finish());
   }
 
   private handleMessage(data: ArrayBuffer) {
     if (!this.ResponseType) return;
+    
     try {
       const message = this.ResponseType.decode(new Uint8Array(data));
       
-      if (message.audioResponse) {
-        // [CRITICAL FIX]: 0-byte uzunluğundaki paketlerde DOMException fırlatmasını engeller
-        if (message.audioResponse.length > 0) {
-            this.audioManager?.playChunk(message.audioResponse);
-            if (this.options.onAudioReceived) this.options.onAudioReceived(message.audioResponse);
+      if (message.audio_response) {
+        if (message.audio_response.length > 0) {
+            this.audioManager?.playChunk(message.audio_response);
+            if (this.options.onAudioReceived) this.options.onAudioReceived(message.audio_response);
         }
       } 
-      else if (message.clearAudioBuffer) {
+      else if (message.clear_audio_buffer) {
         this.audioManager?.flushPlayback();
       }
       else if (message.transcript) {
         Logger.info("TRANSCRIPT_RECEIVED", "Received text from AI Pipeline", { text: message.transcript.text });
-        if (this.options.onTranscript) {
-             this.options.onTranscript(message.transcript);
-        }
-      }
-      else if (message.textResponse) {
-        // Legacy metin yanıtı (kullanılmıyor, ancak kırılmaması için tutuldu)
+        if (this.options.onTranscript) this.options.onTranscript(message.transcript);
       }
     } catch (e) {
-      Logger.error("WS_DECODE_ERROR", "Failed to decode incoming Protobuf message", { error: e });
+      // [CRITICAL FALLBACK]: Kütüphane çökse bile sesi çal!
+      Logger.warn("WS_DECODE_ERROR", "Protobuf decode failed, attempting manual rescue...", { error: e });
+      const arr = new Uint8Array(data);
+      // Tag 1 (audio_response) = 0x0A
+      if (arr[0] === 0x0A) {
+         let offset = 1; let len = 0; let shift = 0;
+         while (offset < arr.length) {
+             const b = arr[offset++];
+             len |= (b & 0x7f) << shift;
+             if ((b & 0x80) === 0) break;
+             shift += 7;
+         }
+         const audioData = arr.subarray(offset, offset + len);
+         if (audioData.length > 0) this.audioManager?.playChunk(audioData);
+      }
     }
   }
 

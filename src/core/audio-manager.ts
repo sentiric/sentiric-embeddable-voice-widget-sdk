@@ -72,11 +72,14 @@ export class SentiricAudioManager {
       // [CRITICAL FIX]: Anında tetiklemek yerine çerçeve (frame) sayıyoruz.
       this.speechFramesCount++;
       
-      if (!this.isSpeaking && this.speechFramesCount >= this.SPEECH_FRAMES_REQUIRED) {
+    if (!this.isSpeaking && this.speechFramesCount >= this.SPEECH_FRAMES_REQUIRED) {
         this.isSpeaking = true;
-        Logger.info("VAD_SPEECH_START", "Valid speech detected. Triggering Barge-in!");
+        Logger.info("VAD_SPEECH_START", "Valid speech detected."); // Log mesajını değiştirdik
         this.flushPlayback(); 
-        this.onInterrupt();   
+        
+        // [CRITICAL TEST FIX]: LLM yavaş yanıt verdiği için, bekleme sırasındaki 
+        // nefes seslerimiz AI'ı iptal etmesin diye Barge-in sinyalini GEÇİCİ olarak kapattık.
+        // this.onInterrupt();   <--- BURAYI YORUMA AL
       }
       
       this.onAudioData(pcmBytes);
