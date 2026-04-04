@@ -1,15 +1,13 @@
-// File: src/utils/logger.ts
-
 /**
  * Sentiric Logger for SDK
- * Geliştirici dostu (Pretty Print) ve SUTS v4.0 (JSON) uyumlu hibrit logger.
+ * Geliştirici dostu (Pretty Print) ve SUTS v4.0 (JSON) uyumlu logger.
  */
 export class Logger {
   private static tenantId: string = 'unknown';
   private static traceId: string | null = null;
   private static sessionId: string | null = null;
   
-  // [YENİ] Geliştirici modunda JSON yerine renkli, okunabilir konsol çıktıları verir.
+  // [YENİ] Konsolu kirletmemek için Pretty Print modu.
   public static debugMode: boolean = true; 
 
   static setContext(tenantId: string, traceId: string, sessionId: string) {
@@ -24,39 +22,30 @@ export class Logger {
 
   private static log(severity: string, event: string, message: string, attributes: any = {}) {
     if (this.debugMode) {
-      // --- PRETTY PRINT MODE (Geliştirici Dostu) ---
       const time = new Date().toLocaleTimeString('en-US', { hour12: false, fractionalSecondDigits: 3 });
-      let color = 'color: #3b82f6; font-weight: bold;'; // INFO (Mavi)
-      if (severity === 'WARN') color = 'color: #f59e0b; font-weight: bold;'; // Sarı
-      if (severity === 'ERROR') color = 'color: #ef4444; font-weight: bold;'; // Kırmızı
+      let color = 'color: #3b82f6; font-weight: bold;'; 
+      if (severity === 'WARN') color = 'color: #f59e0b; font-weight: bold;'; 
+      if (severity === 'ERROR') color = 'color: #ef4444; font-weight: bold;'; 
       
       console.log(
         `%c[${time}] [${severity}] [${event}]%c ${message}`,
         color, 'color: inherit;',
         Object.keys(attributes).length ? attributes : ''
       );
-      return; // Pretty print ise JSON basma.
+      return;
     }
 
-    // --- SUTS v4.0 JSON MODE (Sunucu / Production) ---
     const record = {
       schema_v: "1.0.0",
       ts: new Date().toISOString(),
       severity,
       tenant_id: this.tenantId,
-      resource: {
-        "service.name": "sentiric-stream-sdk",
-        "service.version": "0.1.12", 
-        "service.env": "production"
-      },
+      resource: { "service.name": "sentiric-stream-sdk", "service.version": "0.1.17", "service.env": "production" },
       trace_id: this.traceId,
       span_id: this.generateSpanId(),
       event,
       message,
-      attributes: {
-        session_id: this.sessionId,
-        ...attributes
-      }
+      attributes: { session_id: this.sessionId, ...attributes }
     };
     console.debug(JSON.stringify(record));
   }

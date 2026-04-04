@@ -4,105 +4,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="https://sentiric.github.io/sentiric-assets/image/favicon.svg">
-    <title>NexGen Store | AI Destekli Alışveriş</title>
+    <title>Sentiric NexGen | AI Destekli Deneyim</title>
     <style>
-        :root {
-            --bg-color: #f8fafc;
-            --text-color: #0f172a;
-            --card-bg: #ffffff;
-            --primary: #4f46e5;
-            --secondary: #64748b;
-            --border: #e2e8f0;
-        }
-        body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; }
-        
-        /* Navbar */
-        nav { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; }
-        .logo { font-size: 1.5rem; font-weight: 800; color: var(--primary); letter-spacing: -1px; }
-        .nav-links { display: flex; gap: 2rem; font-weight: 500; color: var(--secondary); }
-        .nav-links a { text-decoration: none; color: inherit; transition: 0.2s; cursor: pointer; }
-        .nav-links a:hover { color: var(--primary); }
-        
-        /* Hero Section */
-        .hero { padding: 4rem 2rem; text-align: center; background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-bottom: 1px solid var(--border); }
-        .hero h1 { font-size: 3rem; margin-bottom: 1rem; color: #1e1b4b; }
-        .hero p { font-size: 1.25rem; color: var(--secondary); max-width: 600px; margin: 0 auto 2rem auto; line-height: 1.6; }
-        
-        /* Product Grid */
-        .container { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; }
+        :root { --bg: #f8fafc; --primary: #4f46e5; --text: #0f172a; --border: #e2e8f0; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; line-height: 1.5; }
+        nav { background: #fff; border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .logo { font-size: 1.25rem; font-weight: 800; color: var(--primary); letter-spacing: -1px; }
+        .hero { padding: 5rem 2rem; text-align: center; background: white; border-bottom: 1px solid var(--border); }
+        .hero h1 { font-size: 3.5rem; font-weight: 900; margin: 0; color: #1e1b4b; }
+        .hero p { font-size: 1.25rem; color: #64748b; max-width: 700px; margin: 1.5rem auto; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 4rem 2rem; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
-        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 1rem; padding: 2rem; text-align: center; transition: transform 0.2s; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); }
-        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
-        .card-icon { font-size: 3rem; margin-bottom: 1rem; }
-        .card h3 { margin: 0 0 1rem 0; font-size: 1.25rem; }
-        .card p { color: var(--secondary); margin: 0; line-height: 1.5; }
-
-        /* Dev Info */
-        .dev-badge { position: absolute; top: 1rem; right: 2rem; font-size: 0.75rem; background: #f1f5f9; padding: 0.25rem 0.75rem; border-radius: 1rem; border: 1px solid var(--border); color: var(--secondary); font-family: monospace; }
+        .card { background: #fff; border: 1px solid var(--border); border-radius: 1.25rem; padding: 2.5rem; transition: transform 0.3s; }
+        .card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+        .card-icon { font-size: 3rem; margin-bottom: 1.5rem; }
+        .v-badge { background: #f1f5f9; padding: 0.2rem 0.6rem; border-radius: 2rem; font-size: 0.7rem; font-family: monospace; color: #64748b; }
     </style>
 </head>
 <body>
-
     <nav>
-        <div class="logo">NexGen Store.</div>
-        <div class="nav-links">
-            <a>Elektronik</a>
-            <a>Giyim</a>
-            <a>Ev & Yaşam</a>
-            <a>Sipariş Takibi</a>
-        </div>
-        <div class="dev-badge" id="app-version">SDK v...</div>
+        <div class="logo">SENTIRIC OS.</div>
+        <div class="v-badge" id="app-version">v...</div>
     </nav>
-
     <header class="hero">
-        <h1>Geleceğin Alışveriş Deneyimi</h1>
-        <p>Aradığınız ürünü bulamıyor musunuz veya siparişinizin nerede olduğunu mu merak ediyorsunuz? <b>Sağ alttaki asistana sorarak anında yardım alabilirsiniz.</b></p>
+        <h1>Geleceği Sesinizle Yönetin.</h1>
+        <p>Sentiric Stream SDK ile tanışın. Herhangi bir web sitesine sadece iki satır kod ekleyerek, <b>duyguları anlayan</b> ve <b>anında cevap veren</b> yapay zeka asistanınızı yayına alın.</p>
     </header>
-
     <main class="container">
-        <h2 style="text-align: center; margin-bottom: 2rem;">Popüler Kategoriler</h2>
         <div class="grid">
             <div class="card">
-                <div class="card-icon">💻</div>
-                <h3>Yeni Nesil Dizüstü Bilgisayarlar</h3>
-                <p>En yüksek performanslı cihazlar şimdi stoklarımızda. Yapay zeka ile geliştirilmiş soğutma teknolojisi.</p>
+                <div class="card-icon">🧠</div>
+                <h3>Sıfır Gecikme</h3>
+                <p>STT ve TTS motorlarımız 20ms'nin altında TTFT süresiyle insan hızında iletişim kurar.</p>
             </div>
             <div class="card">
-                <div class="card-icon">🎧</div>
-                <h3>Gürültü Engelleyici Kulaklıklar</h3>
-                <p>Dış dünyayı sessize alın. 40 saate varan pil ömrü ile müziğin keyfini kesintisiz çıkarın.</p>
+                <div class="card-icon">🎭</div>
+                <h3>Duygusal Zeka</h3>
+                <p>Sesinizdeki heyecanı, kızgınlığı veya üzüntüyü anlar, ona göre tavır değiştirir.</p>
             </div>
             <div class="card">
-                <div class="card-icon">⌚</div>
-                <h3>Akıllı Saatler</h3>
-                <p>Sağlığınızı bileğinizden takip edin. Nabız, EKG ve adım sayar özellikleri tek bir cihazda.</p>
+                <div class="card-icon">🛡️</div>
+                <h3>%100 Güvenli</h3>
+                <p>Tüm akış mTLS ile şifrelenir ve verileriniz asla dışarı sızmaz.</p>
             </div>
         </div>
     </main>
 
-    <!-- Sentiric SDK Entegrasyonu (Modül olarak) -->
     <script type="module" src="/src/index.ts"></script>
-
-    <!-- Sentiric AI Voice Widget -->
-    <!-- DİKKAT: Müşteri kendi sitesine sadece bu 2 satırı ekleyecek -->
-    <sentiric-voice-widget 
-        id="myWidget"
-        tenant-id="demo-tenant" 
-        theme-color="#4f46e5"
-        language="tr-TR">
-    </sentiric-voice-widget>
+    <sentiric-voice-widget id="myWidget" tenant-id="demo-tenant" theme-color="#4f46e5" language="tr-TR"></sentiric-voice-widget>
 
     <script type="module">
         document.getElementById('app-version').innerText = `SDK v${__APP_VERSION__}`;
-        
-        // Ortam değişkeninden gateway URL'sini al, yoksa lokale bağlan
-        const gatewayUrl = import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws";
         const widget = document.getElementById('myWidget');
-        
-        if (widget) {
-            widget.setAttribute('gateway-url', gatewayUrl);
-        }
+        if (widget) widget.setAttribute('gateway-url', import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws");
     </script>
-
 </body>
 </html>
