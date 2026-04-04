@@ -1,8 +1,10 @@
-import {
-  StreamSessionRequest,
+// [ARCH-COMPLIANCE] sentiric-stream-sdk/src/core/stream-client.ts
+// NİHAİ SÜRÜM: Tip Güvenliği ve Dinamik Orkestrasyon
+import { 
+  StreamSessionRequest, 
   StreamSessionResponse,
   TranscriptEvent
-} from '@sentiric/contracts/stream';
+} from '@sentiric/contracts/stream'; 
 
 import { SentiricAudioManager } from './audio-manager';
 import { Logger } from '../utils/logger';
@@ -22,7 +24,6 @@ export interface StreamClientOptions {
   onClose?: () => void;
 }
 
-// [ARCH-COMPLIANCE] Standard UUID format (Daha profesyonel log takibi için)
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0, v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -35,7 +36,7 @@ export class SentiricStreamClient {
   private options: StreamClientOptions;
   private isReady: boolean = false;
   private audioManager: SentiricAudioManager | null = null;
-
+  
   public readonly traceId: string;
   public readonly sessionId: string;
 
@@ -50,15 +51,15 @@ export class SentiricStreamClient {
     this.audioManager = new SentiricAudioManager((c) => this.sendAudio(c), () => this.sendInterrupt(), this.options.sampleRate);
     await this.connect();
     await this.audioManager.startMicrophone();
-    Logger.info("SESSION_ACTIVE", "AI Session started with full type-safety.");
+    Logger.info("SESSION_ACTIVE", "AI Session started successfully.");
   }
 
   private async connect(): Promise<void> {
     return new Promise((resolve) => {
       this.ws = new WebSocket(this.options.gatewayUrl);
       this.ws.binaryType = 'arraybuffer';
-      this.ws.onopen = () => {
-        this.isReady = true;
+      this.ws.onopen = () => { 
+        this.isReady = true; 
         const configReq = StreamSessionRequest.fromPartial({
           config: {
             token: this.options.token!,
@@ -70,7 +71,7 @@ export class SentiricStreamClient {
           }
         });
         this.ws?.send(StreamSessionRequest.encode(configReq).finish());
-        resolve();
+        resolve(); 
       };
       this.ws.onmessage = (e) => this.handleMessage(e.data);
       this.ws.onclose = () => { if (this.isReady) setTimeout(() => this.connect(), 2000); };
@@ -94,23 +95,30 @@ export class SentiricStreamClient {
       const message = StreamSessionResponse.decode(new Uint8Array(data));
 
       if (message.audioResponse && message.audioResponse.length > 0) {
-        this.audioManager?.playChunk(message.audioResponse);
-      }
+          // [ZEKA]: AI konuşmaya başladığında VAD modunu değiştir
+          this.audioManager?.setAiSpeaking(true);
+          this.audioManager?.playChunk(message.audioResponse);
+          if (this.options.onAudioReceived) this.options.onAudioReceived(message.audioResponse);
+      } 
       else if (message.transcript) {
-        // [DEBUG LOG]: Duygu datası geliyor mu kontrol et
-        console.log("🔍 AFFECTIVE DEBUG:", {
-          gender: message.transcript.gender,
-          emotion: message.transcript.emotion
-        });
+          // [ZEKA]: Kullanıcı konuşuyorsa (isFinal: false) sessizlik süresini esnet
+          if (message.transcript.sender === 'USER') {
+              this.audioManager?.setElasticMode(!message.transcript.isFinal);
+          }
 
-        Logger.info("TRANSCRIPT_RECEIVED", `[${message.transcript.sender}] ${message.transcript.text}`);
-        if (this.options.onTranscript) this.options.onTranscript(message.transcript);
+          // [ZEKA]: AI konuşması tamamen bittiyse (isFinal: true) VAD'ı normale çek
+          if (message.transcript.sender === 'AI' && message.transcript.isFinal) {
+              this.audioManager?.setAiSpeaking(false);
+          }
+
+          if (this.options.onTranscript) this.options.onTranscript(message.transcript);
       }
       else if (message.clearAudioBuffer) {
-        this.audioManager?.flushPlayback();
+          // Sunucudan gelen kesin durdurma emri
+          this.audioManager?.flushPlayback();
       }
     } catch (e) {
-      Logger.error("WS_DECODE_ERROR", "Decode fail", { error: e });
+      Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.");
     }
   }
 
@@ -118,5 +126,6 @@ export class SentiricStreamClient {
     this.isReady = false;
     this.ws?.close();
     this.audioManager?.stop();
+    Logger.info("SESSION_STOPPED", "User ended session.");
   }
 }
