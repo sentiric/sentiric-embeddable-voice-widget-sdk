@@ -24,8 +24,6 @@ function generateUUID() {
   });
 }
 
-// [CRITICAL FIX]: Rust (Backend) ile %100 aynı proto şemasını metin olarak tanımlıyoruz. 
-// Bu sayede JSON tip hatalarından (RangeError) tamamen kurtuluyoruz.
 const PROTO_DEF = `
 syntax = "proto3";
 package sentiric.stream.v1;
@@ -185,14 +183,15 @@ export class SentiricStreamClient {
 
   private sendSessionConfig() {
     if (!this.ws || !this.RequestType) return;
+    // JS Objelerini Protobuf için güvenli camelCase olarak gönderiyoruz
     const message = this.RequestType.create({
       config: {
         token: this.options.token,
         language: this.options.language,
-        sample_rate: this.options.sampleRate,
-        edge_mode: this.options.edgeMode,
-        trace_id: this.traceId,
-        session_id: this.sessionId
+        sampleRate: this.options.sampleRate,
+        edgeMode: this.options.edgeMode,
+        traceId: this.traceId,
+        sessionId: this.sessionId
       }
     });
     this.ws.send(this.RequestType.encode(message).finish());
@@ -207,7 +206,7 @@ export class SentiricStreamClient {
 
   private sendAudio(chunk: Uint8Array) {
     if (!this.isReady || !this.ws || !this.RequestType) return;
-    const message = this.RequestType.create({ audio_chunk: chunk });
+    const message = this.RequestType.create({ audioChunk: chunk });
     this.ws.send(this.RequestType.encode(message).finish());
   }
 
@@ -215,20 +214,28 @@ export class SentiricStreamClient {
     if (!this.ResponseType) return;
     
     try {
-      const message = this.ResponseType.decode(new Uint8Array(data));
+      const decoded = this.ResponseType.decode(new Uint8Array(data));
       
-      if (message.audio_response) {
-        if (message.audio_response.length > 0) {
-            this.audioManager?.playChunk(message.audio_response);
-            if (this.options.onAudioReceived) this.options.onAudioReceived(message.audio_response);
+      // [CRITICAL FIX]: protobufjs snake_case key'leri camelCase'e çeviriyor.
+      // Emniyet kemeri takıyoruz ve iki ihtimali de kontrol ediyoruz.
+      const audioData = decoded.audioResponse || decoded.audio_response;
+      const clearBuffer = decoded.clearAudioBuffer || decoded.clear_audio_buffer;
+      const transcriptEvent = decoded.transcript;
+
+      if (audioData) {
+        // Garantili bir Uint8Array view çıkarıyoruz
+        const chunk = new Uint8Array(audioData);
+        if (chunk.length > 0) {
+            this.audioManager?.playChunk(chunk);
+            if (this.options.onAudioReceived) this.options.onAudioReceived(chunk);
         }
       } 
-      else if (message.clear_audio_buffer) {
+      else if (clearBuffer) {
         this.audioManager?.flushPlayback();
       }
-      else if (message.transcript) {
-        Logger.info("TRANSCRIPT_RECEIVED", "Received text from AI Pipeline", { text: message.transcript.text });
-        if (this.options.onTranscript) this.options.onTranscript(message.transcript);
+      else if (transcriptEvent) {
+        Logger.info("TRANSCRIPT_RECEIVED", `[${transcriptEvent.sender}] ${transcriptEvent.text}`);
+        if (this.options.onTranscript) this.options.onTranscript(transcriptEvent);
       }
     } catch (e) {
       Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });
