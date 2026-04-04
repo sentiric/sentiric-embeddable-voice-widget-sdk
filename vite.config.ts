@@ -4,17 +4,14 @@ import pkg from './package.json';
 
 export default defineConfig({
   base: './',
-
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
-
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
     },
   },
-
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
@@ -26,9 +23,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-      },
-      output: {
-        inlineDynamicImports: false
       }
     },
   }

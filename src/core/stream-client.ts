@@ -46,7 +46,8 @@ export class SentiricStreamClient {
     this.sessionId = options.sessionId || generateUUID();
     this.options = {
       language: "tr-TR",
-      sampleRate: 24000,
+      // [ARCH-COMPLIANCE FIX] STT Whisper Uyumu İçin SDK varsayılanı 16000Hz'e Çekildi
+      sampleRate: 16000,
       edgeMode: false,
       token: "guest-token",
       ...options,
@@ -131,7 +132,7 @@ export class SentiricStreamClient {
         this.audioManager?.flushPlayback();
       }
     } catch (e) {
-      Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.");
+      Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });
     }
   }
 

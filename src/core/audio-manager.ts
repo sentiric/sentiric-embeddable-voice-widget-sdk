@@ -136,17 +136,10 @@ export class SentiricAudioManager {
     if (!this.audioContext || pcmData.length === 0) return;
 
     try {
-      const safeLength = Math.floor(pcmData.byteLength / 2) * 2;
-      const alignedBuffer =
-        pcmData.byteLength === safeLength
-          ? pcmData
-          : pcmData.slice(0, safeLength);
-
-      const int16Buffer = new Int16Array(
-        alignedBuffer.buffer,
-        alignedBuffer.byteOffset,
-        alignedBuffer.byteLength / 2,
-      );
+      // [ARCH-COMPLIANCE FIX] Bellek Kayması (Alignment) ve RangeError Hatası Düzeltildi
+      // PcmData'yı doğrudan buffer olarak kullanmak yerine güvenli bir şekilde kopyalıyoruz
+      const safeArray = new Uint8Array(pcmData);
+      const int16Buffer = new Int16Array(safeArray.buffer);
       const float32Buffer = new Float32Array(int16Buffer.length);
 
       for (let i = 0; i < int16Buffer.length; i++) {
@@ -175,13 +168,12 @@ export class SentiricAudioManager {
         this.activeSourceNodes = this.activeSourceNodes.filter(
           (n) => n !== source,
         );
-        // Eğer çalınacak başka paket kalmadıysa AI sustu demektir
         if (this.activeSourceNodes.length === 0) {
           this.setAiSpeaking(false);
         }
       };
     } catch (e) {
-      console.warn("Playback error:", e);
+      console.warn("Playback error (Handled):", e);
     }
   }
 
@@ -189,7 +181,9 @@ export class SentiricAudioManager {
     this.activeSourceNodes.forEach((node) => {
       try {
         node.stop();
-      } catch (e) {}
+      } catch (e) {
+        // Oynatıcı zaten durmuş olabilir, bu yüzden hatayı yutuyoruz
+      }
     });
     this.activeSourceNodes = [];
     this.nextStartTime = this.audioContext ? this.audioContext.currentTime : 0;
