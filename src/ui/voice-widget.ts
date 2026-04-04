@@ -1,5 +1,8 @@
-// [ARCH-COMPLIANCE] stream-sdk/src/ui/voice-widget.ts
 import { SentiricStreamClient } from '../core/stream-client';
+
+// Vite magic: Dış dosyaları string olarak içeri alıyoruz
+import htmlTemplate from './voice-widget.html?raw';
+import cssTemplate from './voice-widget.css?inline';
 
 export class SentiricVoiceWidget extends HTMLElement {
   private client: SentiricStreamClient | null = null;
@@ -16,11 +19,24 @@ export class SentiricVoiceWidget extends HTMLElement {
   static get observedAttributes() { return ['tenant-id', 'gateway-url', 'language', 'theme-color']; }
 
   connectedCallback() {
-    this.render();
+    this.initUI();
+  }
+
+  private initUI() {
+    const themeColor = this.getAttribute('theme-color') || '#3b82f6';
+    
+    // HTML ve CSS'i dış dosyalardan birleştiriyoruz
+    this.shadow.innerHTML = `
+      <style>${cssTemplate.replace('--theme-color: #3b82f6;', `--theme-color: ${themeColor};`)}</style>
+      ${htmlTemplate}
+    `;
+
     this.transcriptBox = this.shadow.querySelector('#transcriptBox');
     
-    // Sağ Tık -> Dev Mode Toggle
-    const btn = this.shadow.querySelector('.main-button');
+    const btn = this.shadow.querySelector('#actionBtn');
+    btn?.addEventListener('click', () => this.toggleConversation());
+    
+    // Sağ Tık -> Dev Mode
     btn?.addEventListener('contextmenu', (e) => {
         e.preventDefault(); 
         this.devModeActive = !this.devModeActive;
@@ -103,38 +119,12 @@ export class SentiricVoiceWidget extends HTMLElement {
   }
 
   private updateUI() {
-    const btn = this.shadow.querySelector('.main-button') as HTMLElement;
+    const btn = this.shadow.querySelector('#actionBtn') as HTMLElement;
     btn.classList.toggle('active', this.isActive);
     btn.innerHTML = this.isActive ? '<span>✕</span>' : '<span>🎤</span>';
   }
-
-  private render() {
-    const themeColor = this.getAttribute('theme-color') || '#3b82f6';
-    this.shadow.innerHTML = `
-      <style>
-        :host { position: fixed; bottom: 30px; right: 30px; z-index: 99999; font-family: system-ui, sans-serif; --theme-color: ${themeColor}; }
-        .main-button { width: 64px; height: 64px; border-radius: 32px; background: var(--theme-color); border: none; color: #fff; cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: 0.3s; position: relative; z-index: 10; }
-        .main-button.active { background: #ef4444; }
-        .main-button.active::after { content: ''; position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 3px solid var(--theme-color); animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.5); opacity: 0; } }
-        .transcript-box { position: absolute; bottom: 90px; right: 0; width: 320px; max-height: 400px; overflow-y: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 16px; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15); opacity: 0; transform: translateY(20px) scale(0.95); transition: 0.3s; pointer-events: none; display: flex; flex-direction: column; gap: 12px; }
-        .transcript-box.visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
-        .message-row { display: flex; gap: 8px; width: 100%; align-items: flex-end; }
-        .message-row.user { justify-content: flex-end; }
-        .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; background: #f1f5f9; border: 1px solid #e2e8f0; position: relative; }
-        .emo-badge { position: absolute; bottom: -4px; right: -4px; font-size: 10px; background: #fff; border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .message { padding: 10px 14px; border-radius: 16px; max-width: 75%; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
-        .message.user { background: var(--theme-color); color: #fff; border-bottom-right-radius: 4px; }
-        .message.ai { background: #f1f5f9; color: #1e293b; border-bottom-left-radius: 4px; }
-        .message.partial { opacity: 0.6; font-style: italic; }
-        .metrics-box { position: absolute; top: -110px; right: 0; width: 220px; background: rgba(15,23,42,0.9); color: #10b981; font-family: monospace; font-size: 10px; padding: 12px; border-radius: 12px; opacity: 0; pointer-events: none; transition: 0.2s; z-index: 15; }
-        .metrics-box.visible { opacity: 1; }
-      </style>
-      <div class="metrics-box"><b>🛠️ Developer Metrics</b><div id="metricsData">No data</div></div>
-      <div class="transcript-box" id="transcriptBox"></div>
-      <button class="main-button" title="Sağ Tık: Geliştirici Modu"><span>🎤</span></button>
-    `;
-    this.shadow.querySelector('.main-button')!.addEventListener('click', () => this.toggleConversation());
-  }
 }
-customElements.define('sentiric-voice-widget', SentiricVoiceWidget);
+
+if (!customElements.get('sentiric-voice-widget')) {
+  customElements.define('sentiric-voice-widget', SentiricVoiceWidget);
+}
