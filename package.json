@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.3",
-    "@sentiric/contracts": "git+https://github.com/sentiric/sentiric-contracts.git#v1.20.5",
+    "@sentiric/contracts": "git+https://github.com/sentiric/sentiric-contracts.git#v1.20.6",
     "protobufjs": "^8.0.0"
   }
 }

@@ -18,6 +18,7 @@ export interface StreamClientOptions {
   language?: string;
   sampleRate?: number;
   edgeMode?: boolean;
+  listenOnlyMode?: boolean; // [YENİ]
   onAudioReceived?: (chunk: Uint8Array) => void;
   onTranscript?: (data: TranscriptEvent) => void;
   onError?: (error: any) => void;
@@ -49,6 +50,7 @@ export class SentiricStreamClient {
       // [ARCH-COMPLIANCE FIX] STT Whisper Uyumu İçin SDK varsayılanı 16000Hz'e Çekildi
       sampleRate: 16000,
       edgeMode: false,
+      listenOnlyMode: false, // [YENİ]
       token: "guest-token",
       ...options,
     };
@@ -78,6 +80,7 @@ export class SentiricStreamClient {
             language: this.options.language!,
             sampleRate: this.options.sampleRate!,
             edgeMode: this.options.edgeMode!,
+            listenOnlyMode: this.options.listenOnlyMode!, // [YENİ]
             traceId: this.traceId,
             sessionId: this.sessionId,
           },
