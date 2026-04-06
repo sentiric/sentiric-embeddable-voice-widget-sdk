@@ -13,19 +13,24 @@ export default defineConfig({
     },
   },
   build: {
-    lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
-      name: 'SentiricStream',
-      fileName: (format) => `stream-sdk.${format === 'es' ? 'js' : 'umd.js'}`,
-      formats: ['es', 'umd'],
-    },
-    minify: 'terser',
+    // Library mode multiple entry points ile çakıştığı için 
+    // lib tanımını kaldırıp rollupOptions ile yönetiyoruz
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        interactive: resolve(__dirname, 'demos/interactive-agent.html'), // EKLENDİ
-        analyst: resolve(__dirname, 'demos/meeting-analyst.html'),       // EKLENDİ
+        interactive: resolve(__dirname, 'demos/interactive-agent.html'),
+        analyst: resolve(__dirname, 'demos/meeting-analyst.html'),
+        // Kütüphane çıktısını da buraya ekliyoruz
+        sdk: resolve(__dirname, 'src/index.ts')
+      },
+      output: {
+        // SDK'yı hala bir kütüphane olarak kullanmak isteyenler için format ayarı
+        entryFileNames: (chunkInfo) => {
+           return chunkInfo.name === 'sdk' ? 'stream-sdk.js' : '[name].js';
+        },
+        format: 'es'
       }
     },
+    minify: 'terser',
   }
 });
