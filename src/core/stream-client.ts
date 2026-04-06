@@ -1,5 +1,4 @@
 // [ARCH-COMPLIANCE] sentiric-stream-sdk/src/core/stream-client.ts
-// NİHAİ SÜRÜM: Tip Güvenliği ve Dinamik Orkestrasyon
 import {
   StreamSessionRequest,
   StreamSessionResponse,
@@ -47,7 +46,6 @@ export class SentiricStreamClient {
     this.sessionId = options.sessionId || generateUUID();
     this.options = {
       language: "tr-TR",
-      // [ARCH-COMPLIANCE FIX] STT Whisper Uyumu İçin SDK varsayılanı 16000Hz'e Çekildi
       sampleRate: 16000,
       edgeMode: false,
       listenOnlyMode: false, // [YENİ]
@@ -61,6 +59,7 @@ export class SentiricStreamClient {
     this.audioManager = new SentiricAudioManager(
       (c) => this.sendAudio(c),
       () => this.sendInterrupt(),
+      () => this.sendEos(), // [YENİ]: EOS Sinyali
       this.options.sampleRate,
     );
     await this.connect();
@@ -101,6 +100,13 @@ export class SentiricStreamClient {
     this.ws.send(StreamSessionRequest.encode(msg).finish());
   }
 
+  // [YENİ]: Sessizlik Bitiş Sinyali
+  private sendEos() {
+    if (!this.isReady || !this.ws) return;
+    const msg = StreamSessionRequest.fromPartial({ control: { event: 2 } }); // EVENT_TYPE_EOS = 2
+    this.ws.send(StreamSessionRequest.encode(msg).finish());
+  }
+
   private sendAudio(chunk: Uint8Array) {
     if (!this.isReady || !this.ws) return;
     const msg = StreamSessionRequest.fromPartial({ audioChunk: chunk });
@@ -112,26 +118,20 @@ export class SentiricStreamClient {
       const message = StreamSessionResponse.decode(new Uint8Array(data));
 
       if (message.audioResponse && message.audioResponse.length > 0) {
-        // [ZEKA]: AI konuşmaya başladığında VAD modunu değiştir
         this.audioManager?.setAiSpeaking(true);
         this.audioManager?.playChunk(message.audioResponse);
         if (this.options.onAudioReceived)
           this.options.onAudioReceived(message.audioResponse);
       } else if (message.transcript) {
-        // [ZEKA]: Kullanıcı konuşuyorsa (isFinal: false) sessizlik süresini esnet
         if (message.transcript.sender === "USER") {
           this.audioManager?.setElasticMode(!message.transcript.isFinal);
         }
-
-        // [ZEKA]: AI konuşması tamamen bittiyse (isFinal: true) VAD'ı normale çek
         if (message.transcript.sender === "AI" && message.transcript.isFinal) {
           this.audioManager?.setAiSpeaking(false);
         }
-
         if (this.options.onTranscript)
           this.options.onTranscript(message.transcript);
       } else if (message.clearAudioBuffer) {
-        // Sunucudan gelen kesin durdurma emri
         this.audioManager?.flushPlayback();
       }
     } catch (e) {

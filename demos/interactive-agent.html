@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Agent Demo | Sentiric OS</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f8fafc; margin: 0; padding: 2rem; text-align: center; }
+        .back-link { position: absolute; top: 1rem; left: 1rem; text-decoration: none; color: #4f46e5; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <a href="../index.html" class="back-link">&larr; Vitrine Dön</a>
+    
+    <h1>🤖 Etkileşimli Ajan Modu</h1>
+    <p style="color: #64748b; max-width: 600px; margin: 0 auto;">
+        Bu modda AI asistanı sizi dinler ve cevap üretir. Konuşurken sağ alttaki mikrofona basarak etkileşimi başlatabilirsiniz. 
+        Asistan konuşurken araya girerseniz (barge-in) anında susacaktır.
+    </p>
+
+    <!-- SDK Import -->
+    <script type="module" src="/src/index.ts"></script>
+    
+    <!-- THE WIDGET (listen-only YOK) -->
+    <sentiric-voice-widget 
+        id="agentWidget" 
+        tenant-id="demo-tenant" 
+        theme-color="#4f46e5" 
+        language="tr-TR">
+    </sentiric-voice-widget>
+
+    <script type="module">
+        const widget = document.getElementById('agentWidget');
+        if (widget) widget.setAttribute('gateway-url', import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws");
+    </script>
+</body>
+</html>

@@ -23,6 +23,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
+        interactive: resolve(__dirname, 'demos/interactive-agent.html'), // EKLENDİ
+        analyst: resolve(__dirname, 'demos/meeting-analyst.html'),       // EKLENDİ
       }
     },
   }

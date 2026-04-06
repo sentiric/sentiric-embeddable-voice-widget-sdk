@@ -1,5 +1,5 @@
 // [ARCH-COMPLIANCE] sentiric-stream-sdk/src/core/audio-manager.ts
-// NİHAİ SÜRÜM: Dinamik VAD ve Elastik Zamanlayıcı
+// NİHAİ SÜRÜM: Dinamik VAD, Elastik Zamanlayıcı ve EOS (End-of-Speech) Sinyali
 import { AUDIO_WORKLET_CODE } from "./audio-processor-worklet";
 import { Logger } from "../utils/logger";
 
@@ -27,27 +27,21 @@ export class SentiricAudioManager {
   constructor(
     private onAudioData: (data: Uint8Array) => void,
     private onInterrupt: () => void,
+    private onEos: () => void, // [YENİ]: Sessizlik bittiğinde tetiklenir
     private sampleRate: number = 24000,
   ) {}
 
-  /**
-   * [ZEKA]: AI konuşurken VAD eşiğini yükseltir (Self-noise masking).
-   * AI sustuğunda kulakları tekrar açar.
-   */
   public setAiSpeaking(active: boolean) {
     this.isAiSpeaking = active;
     if (active) {
-      this.vadThreshold = this.BASE_THRESHOLD * 2.5; // AI sesini gürültü say
-      this.vadPauseTime = 1000; // Söz kesme sinyali daha hızlı gitmeli
+      this.vadThreshold = this.BASE_THRESHOLD * 2.5;
+      this.vadPauseTime = 1000;
     } else {
       this.vadThreshold = this.BASE_THRESHOLD;
       this.vadPauseTime = this.BASE_PAUSE_TIME;
     }
   }
 
-  /**
-   * [ZEKA]: Kullanıcı düşünürken (isFinal: false) süreyi uzatır.
-   */
   public setElasticMode(isUserThinking: boolean) {
     if (!this.isAiSpeaking) {
       this.vadPauseTime = isUserThinking ? 2800 : 1200;
@@ -119,12 +113,14 @@ export class SentiricAudioManager {
       this.onAudioData(pcmBytes);
     } else {
       this.speechFramesCount = 0;
+      // KULLANICI SUSTUĞUNDA
       if (
         this.isSpeaking &&
         Date.now() - this.lastSpkTime > this.vadPauseTime
       ) {
         this.isSpeaking = false;
-        Logger.info("VAD_SPEECH_STOP", "User silent. Waiting for AI response.");
+        Logger.info("VAD_SPEECH_STOP", "User silent. Sending EOS to server.");
+        this.onEos(); // [YENİ]: Sunucuya Cümle Bitti sinyali yolla
       }
       if (this.isSpeaking) {
         this.onAudioData(pcmBytes);
@@ -134,10 +130,7 @@ export class SentiricAudioManager {
 
   public playChunk(pcmData: Uint8Array): void {
     if (!this.audioContext || pcmData.length === 0) return;
-
     try {
-      // [ARCH-COMPLIANCE FIX] Bellek Kayması (Alignment) ve RangeError Hatası Düzeltildi
-      // PcmData'yı doğrudan buffer olarak kullanmak yerine güvenli bir şekilde kopyalıyoruz
       const safeArray = new Uint8Array(pcmData);
       const int16Buffer = new Int16Array(safeArray.buffer);
       const float32Buffer = new Float32Array(int16Buffer.length);
@@ -181,9 +174,7 @@ export class SentiricAudioManager {
     this.activeSourceNodes.forEach((node) => {
       try {
         node.stop();
-      } catch (e) {
-        // Oynatıcı zaten durmuş olabilir, bu yüzden hatayı yutuyoruz
-      }
+      } catch (e) {}
     });
     this.activeSourceNodes = [];
     this.nextStartTime = this.audioContext ? this.audioContext.currentTime : 0;
