@@ -90,6 +90,8 @@ export class SentiricVoiceWidget extends HTMLElement {
       onClose: () => this.stop(),
       onError: () => this.stop(),
       onTranscript: (data) => this.handleTranscript(data),
+      // [YENİ EKLENDİ]: Status Update dinleyicisi
+      onStatusUpdate: (statusStr) => this.handleStatusUpdate(statusStr),      
     });
 
     this.isActive = true;
@@ -207,6 +209,41 @@ export class SentiricVoiceWidget extends HTMLElement {
       top: this.transcriptBox.scrollHeight,
       behavior: "smooth",
     });
+  }
+
+  // [YENİ]: Deep Waters Visualizer
+  private handleStatusUpdate(statusStr: string) {
+    try {
+      const status = JSON.parse(statusStr);
+      
+      if (status.type === "MOOD_SHIFT") {
+        console.log(`🌊 [DEEP WATERS TRIGGERED]: Kullanıcı ruh hali değişti! Yeni Mod: ${status.new_mood} (Shift: ${status.arousal_shift.toFixed(2)})`);
+        
+        // Ekranda Developer Metrics açıksa (Gözlemci modu) oraya bildirim basalım
+        if (this.transcriptBox) {
+          const shiftId = `shift-${Date.now()}`;
+          const color = status.new_mood === "angry" ? "#ef4444" : (status.new_mood === "excited" ? "#f59e0b" : "#3b82f6");
+          const emoji = status.new_mood === "angry" ? "😡" : (status.new_mood === "excited" ? "🤩" : "🧘");
+          
+          const alertHtml = `
+            <div id="${shiftId}" style="background: rgba(15, 23, 42, 0.8); border: 1px solid ${color}; color: ${color}; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 11px; font-family: monospace; animation: pulse 1s infinite; text-align: center;">
+              ${emoji} AKUSTİK ANOMALİ: Ruh hali <b>${status.new_mood.toUpperCase()}</b> olarak değişti! (Fark: ${status.arousal_shift.toFixed(2)})
+            </div>
+          `;
+          
+          this.transcriptBox.insertAdjacentHTML('beforeend', alertHtml);
+          this.transcriptBox.scrollTo({ top: this.transcriptBox.scrollHeight, behavior: "smooth" });
+          
+          // 4 saniye sonra yanıp sönmeyi (pulse) durdur
+          setTimeout(() => {
+            const el = this.transcriptBox?.querySelector(`#${shiftId}`) as HTMLElement;
+            if (el) el.style.animation = 'none';
+          }, 4000);
+        }
+      }
+    } catch(e) {
+      console.error("Status parse error", e);
+    }
   }
 
   private updateUI() {

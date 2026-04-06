@@ -20,6 +20,7 @@ export interface StreamClientOptions {
   listenOnlyMode?: boolean; // [YENİ]
   onAudioReceived?: (chunk: Uint8Array) => void;
   onTranscript?: (data: TranscriptEvent) => void;
+  onStatusUpdate?: (statusStr: string) => void; // [YENİ EKLENDİ]  
   onError?: (error: any) => void;
   onClose?: () => void;
 }
@@ -133,6 +134,11 @@ export class SentiricStreamClient {
           this.options.onTranscript(message.transcript);
       } else if (message.clearAudioBuffer) {
         this.audioManager?.flushPlayback();
+      } else if (message.statusUpdate) {
+        // [YENİ EKLENDİ]: Gateway'den gelen Status (Mood Shift vb.) yakalandı!
+        if (this.options.onStatusUpdate) {
+          this.options.onStatusUpdate(message.statusUpdate);
+        }
       }
     } catch (e) {
       Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });
