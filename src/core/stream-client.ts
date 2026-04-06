@@ -20,7 +20,7 @@ export interface StreamClientOptions {
   listenOnlyMode?: boolean; // [YENİ]
   onAudioReceived?: (chunk: Uint8Array) => void;
   onTranscript?: (data: TranscriptEvent) => void;
-  onStatusUpdate?: (statusStr: string) => void; // [YENİ EKLENDİ]  
+  onStatusUpdate?: (statusStr: string) => void; // [YENİ EKLENDİ]
   onError?: (error: any) => void;
   onClose?: () => void;
 }
