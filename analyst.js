@@ -1,0 +1,1 @@
+import"./assets/modulepreload-polyfill-CNgwewHt.js";import"./stream-sdk.js";var t=document.getElementById("analystWidget");t&&t.setAttribute("gateway-url","wss://http-stream-gateway-service-sentiric.azmisahin.com/ws");
