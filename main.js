@@ -1,1 +1,1 @@
-import"./assets/modulepreload-polyfill-CNgwewHt.js";document.getElementById("app-version").innerText="SDK v0.1.29";
+import"./assets/modulepreload-polyfill-CNgwewHt.js";document.getElementById("app-version").innerText="SDK v0.1.30";
