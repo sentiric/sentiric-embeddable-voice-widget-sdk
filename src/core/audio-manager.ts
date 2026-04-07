@@ -153,8 +153,10 @@ export class SentiricAudioManager {
       // [MİMARİ DÜZELTME]: Gapless Playback Priming Buffer
       if (!this.isPlaybackStarted) {
         this.primingBuffer.push(float32Buffer);
-        const currentBufferedDuration = 
-          this.primingBuffer.reduce((sum, arr) => sum + arr.length, 0) / this.sampleRate * 1000;
+        const currentBufferedDuration =
+          (this.primingBuffer.reduce((sum, arr) => sum + arr.length, 0) /
+            this.sampleRate) *
+          1000;
 
         if (currentBufferedDuration >= this.PRIMING_BUFFER_DURATION_MS) {
           this.isPlaybackStarted = true;
@@ -170,15 +172,18 @@ export class SentiricAudioManager {
 
   private flushPrimingBuffer(): void {
     if (this.primingBuffer.length === 0 || !this.audioContext) return;
-    
-    const totalLength = this.primingBuffer.reduce((sum, arr) => sum + arr.length, 0);
+
+    const totalLength = this.primingBuffer.reduce(
+      (sum, arr) => sum + arr.length,
+      0,
+    );
     const concatenated = new Float32Array(totalLength);
     let offset = 0;
     for (const chunk of this.primingBuffer) {
       concatenated.set(chunk, offset);
       offset += chunk.length;
     }
-    
+
     // Event Loop'a nefes aldırmak ve jitter'ı engellemek için 50ms avans
     this.nextStartTime = this.audioContext.currentTime + 0.05;
     this.schedulePlayback(concatenated);
@@ -187,7 +192,7 @@ export class SentiricAudioManager {
 
   private schedulePlayback(float32Buffer: Float32Array): void {
     if (!this.audioContext) return;
-    
+
     const audioBuffer = this.audioContext.createBuffer(
       1,
       float32Buffer.length,

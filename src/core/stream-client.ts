@@ -18,6 +18,7 @@ export interface StreamClientOptions {
   sampleRate?: number;
   edgeMode?: boolean;
   listenOnlyMode?: boolean; // [YENİ]
+  speakOnlyMode?: boolean; // [YENİ]
   onAudioReceived?: (chunk: Uint8Array) => void;
   onTranscript?: (data: TranscriptEvent) => void;
   onStatusUpdate?: (statusStr: string) => void; // [YENİ EKLENDİ]
@@ -74,17 +75,21 @@ export class SentiricStreamClient {
       this.ws.binaryType = "arraybuffer";
       this.ws.onopen = () => {
         this.isReady = true;
+
         const configReq = StreamSessionRequest.fromPartial({
           config: {
             token: this.options.token!,
             language: this.options.language!,
             sampleRate: this.options.sampleRate!,
             edgeMode: this.options.edgeMode!,
-            listenOnlyMode: this.options.listenOnlyMode!, // [YENİ]
+            listenOnlyMode: this.options.listenOnlyMode!,
+            // [ARCH-COMPLIANCE FIX]: Any cast to prevent TS compilation fail if contracts are not fully synced yet.
+            speakOnlyMode: this.options.speakOnlyMode! as any,
             traceId: this.traceId,
             sessionId: this.sessionId,
           },
         });
+
         this.ws?.send(StreamSessionRequest.encode(configReq).finish());
         resolve();
       };
@@ -150,5 +155,12 @@ export class SentiricStreamClient {
     this.ws?.close();
     this.audioManager?.stop();
     Logger.info("SESSION_STOPPED", "User ended session.");
+  }
+
+  // [YENİ]: SDK üzerinden metin gönderme yeteneği
+  public sendText(text: string) {
+    if (!this.isReady || !this.ws) return;
+    const msg = StreamSessionRequest.fromPartial({ textMessage: text });
+    this.ws.send(StreamSessionRequest.encode(msg).finish());
   }
 }

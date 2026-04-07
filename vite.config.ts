@@ -20,6 +20,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         interactive: resolve(__dirname, 'demos/interactive-agent.html'),
         analyst: resolve(__dirname, 'demos/meeting-analyst.html'),
+        megaphone: resolve(__dirname, 'demos/megaphone.html'),
         // Kütüphane çıktısını da buraya ekliyoruz
         sdk: resolve(__dirname, 'src/index.ts')
       },
