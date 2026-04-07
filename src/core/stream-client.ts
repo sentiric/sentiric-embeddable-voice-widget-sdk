@@ -19,6 +19,7 @@ export interface StreamClientOptions {
   edgeMode?: boolean;
   listenOnlyMode?: boolean; // [YENİ]
   speakOnlyMode?: boolean; // [YENİ]
+  chatOnlyMode?: boolean; // [YENİ]
   onAudioReceived?: (chunk: Uint8Array) => void;
   onTranscript?: (data: TranscriptEvent) => void;
   onStatusUpdate?: (statusStr: string) => void; // [YENİ EKLENDİ]
@@ -85,6 +86,7 @@ export class SentiricStreamClient {
             listenOnlyMode: this.options.listenOnlyMode!,
             // [ARCH-COMPLIANCE FIX]: Any cast to prevent TS compilation fail if contracts are not fully synced yet.
             speakOnlyMode: this.options.speakOnlyMode! as any,
+            chatOnlyMode: this.options.chatOnlyMode! as any, // [YENİ]
             traceId: this.traceId,
             sessionId: this.sessionId,
           },

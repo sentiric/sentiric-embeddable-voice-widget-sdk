@@ -21,6 +21,7 @@ export default defineConfig({
         interactive: resolve(__dirname, 'demos/interactive-agent.html'),
         analyst: resolve(__dirname, 'demos/meeting-analyst.html'),
         megaphone: resolve(__dirname, 'demos/megaphone.html'),
+        omnichat: resolve(__dirname, 'demos/omni-chat.html'),
         // Kütüphane çıktısını da buraya ekliyoruz
         sdk: resolve(__dirname, 'src/index.ts')
       },
