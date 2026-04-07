@@ -58,18 +58,6 @@ export class SentiricStreamClient {
     Logger.setContext(this.options.tenantId, this.traceId, this.sessionId);
   }
 
-  public async start(): Promise<void> {
-    this.audioManager = new SentiricAudioManager(
-      (c) => this.sendAudio(c),
-      () => this.sendInterrupt(),
-      () => this.sendEos(), // [YENİ]: EOS Sinyali
-      this.options.sampleRate,
-    );
-    await this.connect();
-    await this.audioManager.startMicrophone();
-    Logger.info("SESSION_ACTIVE", "AI Session started successfully.");
-  }
-
   private async connect(): Promise<void> {
     return new Promise((resolve) => {
       this.ws = new WebSocket(this.options.gatewayUrl);
@@ -157,6 +145,23 @@ export class SentiricStreamClient {
     this.ws?.close();
     this.audioManager?.stop();
     Logger.info("SESSION_STOPPED", "User ended session.");
+  }
+
+  public async start(): Promise<void> {
+    this.audioManager = new SentiricAudioManager(
+      (c) => this.sendAudio(c),
+      () => this.sendInterrupt(),
+      () => this.sendEos(),
+      this.options.sampleRate,
+    );
+    await this.connect();
+
+    // [ARCH-COMPLIANCE FIX]: Eğer Chat (Yazışma) modundaysak kamerayı/mikrofonu AÇMA!
+    if (!this.options.chatOnlyMode) {
+      await this.audioManager.startMicrophone();
+    }
+
+    Logger.info("SESSION_ACTIVE", "AI Session started successfully.");
   }
 
   // [YENİ]: SDK üzerinden metin gönderme yeteneği
