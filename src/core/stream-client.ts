@@ -17,12 +17,12 @@ export interface StreamClientOptions {
   language?: string;
   sampleRate?: number;
   edgeMode?: boolean;
-  listenOnlyMode?: boolean; // [YENİ]
-  speakOnlyMode?: boolean; // [YENİ]
-  chatOnlyMode?: boolean; // [YENİ]
+  listenOnlyMode?: boolean;
+  speakOnlyMode?: boolean;
+  chatOnlyMode?: boolean;
   onAudioReceived?: (chunk: Uint8Array) => void;
   onTranscript?: (data: TranscriptEvent) => void;
-  onStatusUpdate?: (statusStr: string) => void; // [YENİ EKLENDİ]
+  onStatusUpdate?: (statusStr: string) => void;
   onError?: (error: any) => void;
   onClose?: () => void;
 }
@@ -51,7 +51,9 @@ export class SentiricStreamClient {
       language: "tr-TR",
       sampleRate: 16000,
       edgeMode: false,
-      listenOnlyMode: false, // [YENİ]
+      listenOnlyMode: false,
+      speakOnlyMode: false,
+      chatOnlyMode: false,
       token: "guest-token",
       ...options,
     };
@@ -65,6 +67,8 @@ export class SentiricStreamClient {
       this.ws.onopen = () => {
         this.isReady = true;
 
+        // [ARCH-COMPLIANCE FIX]: any cast'ler kaldırıldı.
+        // @sentiric/contracts v1.20.8 yüklü olduğu varsayılarak type-safe gönderim yapılıyor.
         const configReq = StreamSessionRequest.fromPartial({
           config: {
             token: this.options.token!,
@@ -72,9 +76,8 @@ export class SentiricStreamClient {
             sampleRate: this.options.sampleRate!,
             edgeMode: this.options.edgeMode!,
             listenOnlyMode: this.options.listenOnlyMode!,
-            // [ARCH-COMPLIANCE FIX]: Any cast to prevent TS compilation fail if contracts are not fully synced yet.
-            speakOnlyMode: this.options.speakOnlyMode! as any,
-            chatOnlyMode: this.options.chatOnlyMode! as any, // [YENİ]
+            speakOnlyMode: this.options.speakOnlyMode!,
+            chatOnlyMode: this.options.chatOnlyMode!,
             traceId: this.traceId,
             sessionId: this.sessionId,
           },
@@ -96,10 +99,9 @@ export class SentiricStreamClient {
     this.ws.send(StreamSessionRequest.encode(msg).finish());
   }
 
-  // [YENİ]: Sessizlik Bitiş Sinyali
   private sendEos() {
     if (!this.isReady || !this.ws) return;
-    const msg = StreamSessionRequest.fromPartial({ control: { event: 2 } }); // EVENT_TYPE_EOS = 2
+    const msg = StreamSessionRequest.fromPartial({ control: { event: 2 } });
     this.ws.send(StreamSessionRequest.encode(msg).finish());
   }
 
@@ -130,7 +132,6 @@ export class SentiricStreamClient {
       } else if (message.clearAudioBuffer) {
         this.audioManager?.flushPlayback();
       } else if (message.statusUpdate) {
-        // [YENİ EKLENDİ]: Gateway'den gelen Status (Mood Shift vb.) yakalandı!
         if (this.options.onStatusUpdate) {
           this.options.onStatusUpdate(message.statusUpdate);
         }
@@ -156,7 +157,6 @@ export class SentiricStreamClient {
     );
     await this.connect();
 
-    // [ARCH-COMPLIANCE FIX]: Eğer Chat (Yazışma) modundaysak kamerayı/mikrofonu AÇMA!
     if (!this.options.chatOnlyMode) {
       await this.audioManager.startMicrophone();
     }
@@ -164,7 +164,6 @@ export class SentiricStreamClient {
     Logger.info("SESSION_ACTIVE", "AI Session started successfully.");
   }
 
-  // [YENİ]: SDK üzerinden metin gönderme yeteneği
   public sendText(text: string) {
     if (!this.isReady || !this.ws) return;
     const msg = StreamSessionRequest.fromPartial({ textMessage: text });
