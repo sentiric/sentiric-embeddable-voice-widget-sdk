@@ -62,7 +62,11 @@ export class SentiricStreamClient {
 
   private async connect(): Promise<void> {
     return new Promise((resolve) => {
-      this.ws = new WebSocket(this.options.gatewayUrl);
+
+      // [ARCH-COMPLIANCE FIX]: Trace ID'yi URL parametresi olarak gönder
+      const urlWithTrace = `${this.options.gatewayUrl}?trace_id=${this.traceId}`;
+            
+      this.ws = new WebSocket(urlWithTrace);
       this.ws.binaryType = "arraybuffer";
       this.ws.onopen = () => {
         this.isReady = true;
