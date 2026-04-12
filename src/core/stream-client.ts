@@ -20,6 +20,11 @@ export interface StreamClientOptions {
   listenOnlyMode?: boolean;
   speakOnlyMode?: boolean;
   chatOnlyMode?: boolean;
+
+  // [ARCH-COMPLIANCE FIX]: Frontend LLM/TTS Yönlendirme Yetenekleri
+  systemPromptId?: string;
+  ttsVoiceId?: string;
+
   onAudioReceived?: (chunk: Uint8Array) => void;
   onTranscript?: (data: TranscriptEvent) => void;
   onStatusUpdate?: (statusStr: string) => void;
@@ -55,6 +60,8 @@ export class SentiricStreamClient {
       speakOnlyMode: false,
       chatOnlyMode: false,
       token: "guest-token",
+      systemPromptId: "PROMPT_SYSTEM_DEFAULT",
+      ttsVoiceId: "",
       ...options,
     };
     Logger.setContext(this.options.tenantId, this.traceId, this.sessionId);
@@ -62,17 +69,13 @@ export class SentiricStreamClient {
 
   private async connect(): Promise<void> {
     return new Promise((resolve) => {
-
-      // [ARCH-COMPLIANCE FIX]: Trace ID'yi URL parametresi olarak gönder
       const urlWithTrace = `${this.options.gatewayUrl}?trace_id=${this.traceId}`;
-            
+
       this.ws = new WebSocket(urlWithTrace);
       this.ws.binaryType = "arraybuffer";
       this.ws.onopen = () => {
         this.isReady = true;
 
-        // [ARCH-COMPLIANCE FIX]: any cast'ler kaldırıldı.
-        // @sentiric/contracts v1.20.8 yüklü olduğu varsayılarak type-safe gönderim yapılıyor.
         const configReq = StreamSessionRequest.fromPartial({
           config: {
             token: this.options.token!,
@@ -84,6 +87,9 @@ export class SentiricStreamClient {
             chatOnlyMode: this.options.chatOnlyMode!,
             traceId: this.traceId,
             sessionId: this.sessionId,
+            // Yeni Alanlar
+            systemPromptId: this.options.systemPromptId,
+            ttsVoiceId: this.options.ttsVoiceId,
           },
         });
 
