@@ -1,4 +1,4 @@
-// [ARCH-COMPLIANCE FIX]: src/ui/voice-widget.ts - Liquid Bottom Bar Tam Geçiş
+// [ARCH-COMPLIANCE FIX]: src/ui/voice-widget.ts - Linter ve Null Check Fixleri
 import { SentiricStreamClient } from "../core/stream-client";
 import htmlTemplate from "./voice-widget.html?raw";
 import cssTemplate from "./voice-widget.css?inline";
@@ -15,7 +15,6 @@ export class SentiricVoiceWidget extends HTMLElement {
   private activeTextEl: HTMLElement | null = null;
   private metricsDataEl: HTMLElement | null = null;
 
-  // Speaker Lock-in ve Renkler
   private lockedSpeakerId: string | null = null;
   private colors = [
     "#3B82F6",
@@ -87,8 +86,7 @@ export class SentiricVoiceWidget extends HTMLElement {
     const tenantId = this.getAttribute("tenant-id") || "";
     if (!gatewayUrl || !tenantId) return;
 
-    if (this.activeTextEl)
-      this.activeTextEl.innerText = "Sisteme bağlanılıyor...";
+    if (this.activeTextEl) this.activeTextEl.innerText = "Bağlanıyor...";
 
     this.client = new SentiricStreamClient({
       gatewayUrl,
@@ -107,7 +105,7 @@ export class SentiricVoiceWidget extends HTMLElement {
     try {
       await this.client.start();
       if (this.activeTextEl) this.activeTextEl.innerText = "Sizi dinliyor...";
-    } catch (err) {
+    } catch {
       if (this.activeTextEl) this.activeTextEl.innerText = "Bağlantı hatası.";
       this.stop();
     }
@@ -133,7 +131,7 @@ export class SentiricVoiceWidget extends HTMLElement {
   }
 
   private getSpeakerInfo(speakerId: string) {
-    if (!speakerId || speakerId === "?")
+    if (!speakerId || speakerId === "?" || speakerId === "AI")
       return { name: "Bilinmeyen", color: "#64748b" };
 
     if (!this.speakerMap[speakerId]) {
@@ -154,7 +152,6 @@ export class SentiricVoiceWidget extends HTMLElement {
     const isFinal = data.isFinal || data.is_final;
     const rawSpeakerId = data.speakerId || data.speaker_id || "?";
 
-    // 1. SPEAKER LOCK-IN MEKANİZMASI (Flicker koruması)
     if (!this.lockedSpeakerId) {
       this.lockedSpeakerId = rawSpeakerId;
     }
@@ -162,7 +159,6 @@ export class SentiricVoiceWidget extends HTMLElement {
     const displaySpeakerId = isUser ? this.lockedSpeakerId || "?" : "AI";
     const spkInfo = this.getSpeakerInfo(displaySpeakerId);
 
-    // 2. LİQUİD EKRANA BASMA
     this.activeSpeakerEl.innerText = isUser ? spkInfo.name : "🤖 YAPAY ZEKA";
     this.activeSpeakerEl.style.color = isUser
       ? spkInfo.color
@@ -180,7 +176,6 @@ export class SentiricVoiceWidget extends HTMLElement {
         : "subtitle-text ai-typing";
     }
 
-    // 3. GELİŞTİRİCİ METRİKLERİ
     if (this.devModeActive && this.metricsDataEl) {
       const v = data.speaker_vec || [];
       this.metricsDataEl.innerHTML = `
@@ -194,11 +189,9 @@ export class SentiricVoiceWidget extends HTMLElement {
       `;
     }
 
-    // 4. KİLİT AÇMA VE TEMİZLİK
     if (isFinal) {
       this.lockedSpeakerId = null;
 
-      // AI cümleyi bitirdiyse ve arkasından hemen kullanıcı konuşmadıysa temizle
       if (!isUser) {
         const currentText = this.activeTextEl.innerText;
         setTimeout(() => {
@@ -230,7 +223,7 @@ export class SentiricVoiceWidget extends HTMLElement {
         this.liquidBar.style.setProperty("--glow-color", glowColor);
 
         if (this.activeTextEl) {
-          this.activeTextEl.innerText = `[Bilişsel Anomali Algılandı: ${status.new_mood.toUpperCase()}]`;
+          this.activeTextEl.innerText = `[Bilişsel Anomali: ${status.new_mood.toUpperCase()}]`;
           this.activeTextEl.className = "subtitle-text partial";
         }
 
@@ -239,7 +232,7 @@ export class SentiricVoiceWidget extends HTMLElement {
             this.liquidBar.style.setProperty("--glow-color", "transparent");
         }, 5000);
       }
-    } catch (_e) {
+    } catch {
       // JSON parse hatasını yoksay
     }
   }

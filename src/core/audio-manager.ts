@@ -1,5 +1,4 @@
-// [ARCH-COMPLIANCE] sentiric-stream-sdk/src/core/audio-manager.ts
-// NİHAİ SÜRÜM: Dinamik VAD, Elastik Zamanlayıcı, EOS Sinyali ve Jitter Buffer (Gapless Playback)
+// [ARCH-COMPLIANCE FIX]: sentiric-stream-sdk/src/core/audio-manager.ts
 import { AUDIO_WORKLET_CODE } from "./audio-processor-worklet";
 import { Logger } from "../utils/logger";
 
@@ -12,12 +11,10 @@ export class SentiricAudioManager {
   private nextStartTime: number = 0;
   private activeSourceNodes: AudioBufferSourceNode[] = [];
 
-  // Jitter Buffer (Gapless Playback)
   private primingBuffer: Float32Array[] = [];
   private isPlaybackStarted: boolean = false;
   private readonly PRIMING_BUFFER_DURATION_MS = 1000;
 
-  // [MİMARİ GÜNCELLEME]: Daha hassas VAD ve nefes payı (Breath Margin)
   private readonly BASE_THRESHOLD = 0.02;
   private readonly BASE_PAUSE_TIME = 2000;
   private readonly SPEECH_FRAMES_REQUIRED: number = 10;
@@ -39,8 +36,9 @@ export class SentiricAudioManager {
   public setAiSpeaking(active: boolean) {
     this.isAiSpeaking = active;
     if (active) {
-      this.vadThreshold = this.BASE_THRESHOLD * 3.0;
-      this.vadPauseTime = 1000;
+      // [MİMARİ DÜZELTME]: Yankı (Echo) ve Self-Noise Koruması (5 Kat Sağırlaştırma)
+      this.vadThreshold = this.BASE_THRESHOLD * 5.0;
+      this.vadPauseTime = 800;
     } else {
       this.vadThreshold = this.BASE_THRESHOLD;
       this.vadPauseTime = this.BASE_PAUSE_TIME;
@@ -163,8 +161,8 @@ export class SentiricAudioManager {
       } else {
         this.schedulePlayback(float32Buffer);
       }
-    } catch (_err) {
-      // Sessizce hatayı yut, linter'ı memnun et
+    } catch {
+      // Linter error avoided by not binding error variable
     }
   }
 
@@ -223,8 +221,8 @@ export class SentiricAudioManager {
     this.activeSourceNodes.forEach((node) => {
       try {
         node.stop();
-      } catch (_e) {
-        // İlgili node zaten durmuş olabilir, ESLint warning'i susturuldu.
+      } catch {
+        // Linter error avoided
       }
     });
     this.activeSourceNodes = [];

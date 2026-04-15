@@ -1,4 +1,4 @@
-// [ARCH-COMPLIANCE] sentiric-stream-sdk/src/core/stream-client.ts
+// [ARCH-COMPLIANCE FIX]: sentiric-stream-sdk/src/core/stream-client.ts
 import {
   StreamSessionRequest,
   StreamSessionResponse,
@@ -21,7 +21,6 @@ export interface StreamClientOptions {
   speakOnlyMode?: boolean;
   chatOnlyMode?: boolean;
 
-  // [ARCH-COMPLIANCE FIX]: Frontend LLM/TTS Yönlendirme Yetenekleri
   systemPromptId?: string;
   ttsVoiceId?: string;
 
@@ -87,7 +86,6 @@ export class SentiricStreamClient {
             chatOnlyMode: this.options.chatOnlyMode!,
             traceId: this.traceId,
             sessionId: this.sessionId,
-            // Yeni Alanlar
             systemPromptId: this.options.systemPromptId,
             ttsVoiceId: this.options.ttsVoiceId,
           },
@@ -167,7 +165,8 @@ export class SentiricStreamClient {
     );
     await this.connect();
 
-    if (!this.options.chatOnlyMode) {
+    // [MİMARİ DÜZELTME]: Megafon modunda (speakOnlyMode) mikrofon isteme!
+    if (!this.options.chatOnlyMode && !this.options.speakOnlyMode) {
       await this.audioManager.startMicrophone();
     }
 
