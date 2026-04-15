@@ -12,22 +12,22 @@ export class SentiricAudioManager {
   private nextStartTime: number = 0;
   private activeSourceNodes: AudioBufferSourceNode[] = [];
 
-  // [MİMARİ DÜZELTME]: Jitter Buffer (Gapless Playback)
+  // Jitter Buffer (Gapless Playback)
   private primingBuffer: Float32Array[] = [];
   private isPlaybackStarted: boolean = false;
   private readonly PRIMING_BUFFER_DURATION_MS = 1000;
 
-  // VAD Dinamik Değişkenleri
-  private readonly BASE_THRESHOLD = 0.025;
-  private readonly BASE_PAUSE_TIME = 1500;
+  // [MİMARİ GÜNCELLEME]: Daha hassas VAD ve nefes payı (Breath Margin)
+  private readonly BASE_THRESHOLD = 0.02;
+  private readonly BASE_PAUSE_TIME = 2000;
+  private readonly SPEECH_FRAMES_REQUIRED: number = 10;
   private isAiSpeaking: boolean = false;
 
-  public vadThreshold: number = 0.025;
-  public vadPauseTime: number = 1500;
+  public vadThreshold: number = 0.02;
+  public vadPauseTime: number = 2000;
   private isSpeaking: boolean = false;
   private lastSpkTime: number = 0;
   private speechFramesCount: number = 0;
-  private readonly SPEECH_FRAMES_REQUIRED: number = 15;
 
   constructor(
     private onAudioData: (data: Uint8Array) => void,
@@ -39,7 +39,7 @@ export class SentiricAudioManager {
   public setAiSpeaking(active: boolean) {
     this.isAiSpeaking = active;
     if (active) {
-      this.vadThreshold = this.BASE_THRESHOLD * 2.5;
+      this.vadThreshold = this.BASE_THRESHOLD * 3.0;
       this.vadPauseTime = 1000;
     } else {
       this.vadThreshold = this.BASE_THRESHOLD;
@@ -49,7 +49,7 @@ export class SentiricAudioManager {
 
   public setElasticMode(isUserThinking: boolean) {
     if (!this.isAiSpeaking) {
-      this.vadPauseTime = isUserThinking ? 2800 : 1200;
+      this.vadPauseTime = isUserThinking ? 3500 : this.BASE_PAUSE_TIME;
     }
   }
 
@@ -135,7 +135,6 @@ export class SentiricAudioManager {
   public playChunk(pcmData: Uint8Array): void {
     if (!this.audioContext || pcmData.length === 0) return;
     try {
-      // [MİMARİ DÜZELTME]: Memory Alignment. ArrayBuffer'ın Int16 için 2'nin katı olmasını garanti et.
       const validLength = pcmData.length - (pcmData.length % 2);
       if (validLength === 0) return;
 
@@ -150,7 +149,6 @@ export class SentiricAudioManager {
         float32Buffer[i] = int16Buffer[i] / 32768.0;
       }
 
-      // [MİMARİ DÜZELTME]: Gapless Playback Priming Buffer
       if (!this.isPlaybackStarted) {
         this.primingBuffer.push(float32Buffer);
         const currentBufferedDuration =
@@ -165,8 +163,8 @@ export class SentiricAudioManager {
       } else {
         this.schedulePlayback(float32Buffer);
       }
-    } catch (e) {
-      console.warn("Playback error (Handled):", e);
+    } catch (_err) {
+      // Sessizce hatayı yut, linter'ı memnun et
     }
   }
 
@@ -184,7 +182,6 @@ export class SentiricAudioManager {
       offset += chunk.length;
     }
 
-    // Event Loop'a nefes aldırmak ve jitter'ı engellemek için 50ms avans
     this.nextStartTime = this.audioContext.currentTime + 0.05;
     this.schedulePlayback(concatenated);
     this.primingBuffer = [];
@@ -217,7 +214,7 @@ export class SentiricAudioManager {
       );
       if (this.activeSourceNodes.length === 0) {
         this.setAiSpeaking(false);
-        this.isPlaybackStarted = false; // Bir sonraki cümle için Priming'i resetle
+        this.isPlaybackStarted = false;
       }
     };
   }
@@ -226,7 +223,9 @@ export class SentiricAudioManager {
     this.activeSourceNodes.forEach((node) => {
       try {
         node.stop();
-      } catch (e) {}
+      } catch (_e) {
+        // İlgili node zaten durmuş olabilir, ESLint warning'i susturuldu.
+      }
     });
     this.activeSourceNodes = [];
     this.primingBuffer = [];

@@ -1,11 +1,18 @@
-<!-- voice-widget.html -->
+<!-- [ARCH-COMPLIANCE FIX]: src/ui/voice-widget.html -->
 <div class="metrics-box" id="metricsBox">
-    <b>🛠️ Developer Metrics</b>
-    <div id="metricsData">No data</div>
+    <div style="font-weight:bold; margin-bottom:8px; color:#fff">🛠️ Crystalline Telemetry</div>
+    <div id="metricsData">Waiting for stream...</div>
 </div>
 
-<div class="transcript-box" id="transcriptBox"></div>
-
-<button class="main-button" id="actionBtn" title="Sağ Tık: Geliştirici Modu">
-    <span>🎤</span>
-</button>
+<div class="liquid-bar" id="liquidBar">
+    <div class="controls">
+        <button class="main-button" id="actionBtn" title="Konuş / Durdur (Sağ Tık: Metrikler)">
+            <span>🎤</span>
+        </button>
+    </div>
+    
+    <div class="transcript-area">
+        <div class="speaker-name" id="activeSpeaker">SİSTEM HAZIR</div>
+        <div class="subtitle-text" id="activeText">Başlamak için mikrofona dokunun.</div>
+    </div>
+</div>

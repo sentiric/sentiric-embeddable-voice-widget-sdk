@@ -1,4 +1,4 @@
-// Dosya: src/ui/voice-widget.ts (İçeriği Değiştirin)
+// [ARCH-COMPLIANCE FIX]: src/ui/voice-widget.ts - Liquid Bottom Bar Tam Geçiş
 import { SentiricStreamClient } from "../core/stream-client";
 import htmlTemplate from "./voice-widget.html?raw";
 import cssTemplate from "./voice-widget.css?inline";
@@ -7,11 +7,16 @@ export class SentiricVoiceWidget extends HTMLElement {
   private client: SentiricStreamClient | null = null;
   private isActive: boolean = false;
   private shadow: ShadowRoot;
-  private transcriptBox: HTMLElement | null = null;
   private devModeActive: boolean = false;
-  private isListenOnly: boolean = false; // [YENİ]
+  private isListenOnly: boolean = false;
 
-  // [YENİ] Diarization Renk Haritası
+  private liquidBar: HTMLElement | null = null;
+  private activeSpeakerEl: HTMLElement | null = null;
+  private activeTextEl: HTMLElement | null = null;
+  private metricsDataEl: HTMLElement | null = null;
+
+  // Speaker Lock-in ve Renkler
+  private lockedSpeakerId: string | null = null;
   private colors = [
     "#3B82F6",
     "#10B981",
@@ -53,7 +58,12 @@ export class SentiricVoiceWidget extends HTMLElement {
       ${htmlTemplate}
     `;
 
-    this.transcriptBox = this.shadow.querySelector("#transcriptBox");
+    this.liquidBar = this.shadow.querySelector("#liquidBar");
+    this.activeSpeakerEl = this.shadow.querySelector("#activeSpeaker");
+    this.activeTextEl = this.shadow.querySelector("#activeText");
+    this.metricsDataEl = this.shadow.querySelector("#metricsData");
+
+    setTimeout(() => this.liquidBar?.classList.add("visible"), 100);
 
     const btn = this.shadow.querySelector("#actionBtn");
     btn?.addEventListener("click", () => this.toggleConversation());
@@ -77,201 +87,173 @@ export class SentiricVoiceWidget extends HTMLElement {
     const tenantId = this.getAttribute("tenant-id") || "";
     if (!gatewayUrl || !tenantId) return;
 
-    if (this.transcriptBox) {
-      this.transcriptBox.innerHTML = "";
-      this.transcriptBox.classList.add("visible");
-    }
+    if (this.activeTextEl)
+      this.activeTextEl.innerText = "Sisteme bağlanılıyor...";
 
     this.client = new SentiricStreamClient({
       gatewayUrl,
       tenantId,
       language: this.getAttribute("language") || "tr-TR",
-      listenOnlyMode: this.isListenOnly, // [YENİ] Modu arka uca gönder
+      listenOnlyMode: this.isListenOnly,
       onClose: () => this.stop(),
       onError: () => this.stop(),
       onTranscript: (data) => this.handleTranscript(data),
-      // [YENİ EKLENDİ]: Status Update dinleyicisi
       onStatusUpdate: (statusStr) => this.handleStatusUpdate(statusStr),
     });
 
     this.isActive = true;
     this.updateUI();
-    await this.client.start();
+
+    try {
+      await this.client.start();
+      if (this.activeTextEl) this.activeTextEl.innerText = "Sizi dinliyor...";
+    } catch (err) {
+      if (this.activeTextEl) this.activeTextEl.innerText = "Bağlantı hatası.";
+      this.stop();
+    }
   }
 
   private stop() {
     this.isActive = false;
     this.client?.stop();
     this.updateUI();
-    this.transcriptBox?.classList.remove("visible");
-    this.speakerMap = {}; // Reset speakers
+    this.lockedSpeakerId = null;
+
+    if (this.activeTextEl) this.activeTextEl.innerText = "Bağlantı kesildi.";
+    if (this.activeSpeakerEl) {
+      this.activeSpeakerEl.innerText = "SİSTEM";
+      this.activeSpeakerEl.style.color = "var(--theme-color)";
+    }
+
+    setTimeout(() => {
+      if (!this.isActive && this.activeTextEl) {
+        this.activeTextEl.innerText = "Başlamak için mikrofona dokunun.";
+      }
+    }, 2000);
   }
 
-  // [YENİ] Dinamik Konuşmacı Bilgisi Üretici
-  private getSpeakerInfo(speakerId: string, gender: string) {
+  private getSpeakerInfo(speakerId: string) {
     if (!speakerId || speakerId === "?")
       return { name: "Bilinmeyen", color: "#64748b" };
+
     if (!this.speakerMap[speakerId]) {
       const idx = Object.keys(this.speakerMap).length;
       const letter = String.fromCharCode(65 + idx);
       this.speakerMap[speakerId] = {
-        name: `Kişi ${letter}`,
+        name: `KİŞİ ${letter}`,
         color: this.colors[idx % this.colors.length],
       };
     }
     return this.speakerMap[speakerId];
   }
 
-  private getAvatarHtml(
-    sender: string,
-    gender: string,
-    emotion: string,
-    color: string,
-  ): string {
-    if (sender === "AI")
-      return `<div class="avatar ai-avatar" style="border-color:${color}">🤖</div>`;
-    let face =
-      gender === "M" || gender === "m"
-        ? "👨"
-        : gender === "F" || gender === "f"
-          ? "👩"
-          : "👤";
-    let emo = "";
-    if (emotion === "excited" || emotion === "happy")
-      emo = '<div class="emo-badge">🔥</div>';
-    else if (emotion === "angry") emo = '<div class="emo-badge">😠</div>';
-    else if (emotion === "sad") emo = '<div class="emo-badge">😢</div>';
-    return `<div class="avatar user-avatar" style="border-color:${color}; color:${color}">${face}${emo}</div>`;
-  }
-
   private handleTranscript(data: any) {
-    if (!this.transcriptBox) return;
+    if (!this.activeTextEl || !this.activeSpeakerEl) return;
+
     const isUser = data.sender === "USER";
-    const activeMsgId = `msg-${isUser ? "user" : "ai"}-active`;
+    const isFinal = data.isFinal || data.is_final;
+    const rawSpeakerId = data.speakerId || data.speaker_id || "?";
 
-    // [YENİ] Zengin Veriyi Çıkar
-    const emotion = data.emotion || "neutral";
-    const gender = data.gender || "?";
-    const speakerId = data.speakerId || data.speaker_id || "?";
-    const spkInfo = this.getSpeakerInfo(speakerId, gender);
-
-    let rowEl = this.transcriptBox.querySelector(
-      `#${activeMsgId}`,
-    ) as HTMLElement | null;
-
-    if (!rowEl) {
-      rowEl = document.createElement("div");
-      rowEl.id = activeMsgId;
-      rowEl.className = `message-row ${isUser ? "user" : "ai"}`;
-
-      const avatar = this.getAvatarHtml(
-        data.sender,
-        gender,
-        emotion,
-        spkInfo.color,
-      );
-      const nameTag = isUser
-        ? `<div style="font-size:10px; color:${spkInfo.color}; font-weight:bold; margin-bottom:2px; margin-left:14px">${spkInfo.name}</div>`
-        : "";
-      const borderColor = isUser
-        ? `border-left: 3px solid ${spkInfo.color};`
-        : "";
-
-      rowEl.innerHTML = `
-        ${!isUser ? avatar : ""}
-        <div style="display:flex; flex-direction:column; flex:1">
-            ${nameTag}
-            <div class="message ${isUser ? "user" : "ai"} partial" style="${borderColor}"></div>
-        </div>
-        ${isUser ? avatar : ""}
-      `;
-      this.transcriptBox.appendChild(rowEl);
+    // 1. SPEAKER LOCK-IN MEKANİZMASI (Flicker koruması)
+    if (!this.lockedSpeakerId) {
+      this.lockedSpeakerId = rawSpeakerId;
     }
 
-    const msgEl = rowEl.querySelector(".message") as HTMLElement;
-    if (msgEl) msgEl.innerText = data.text || data.text_chunk || "";
+    const displaySpeakerId = isUser ? this.lockedSpeakerId || "?" : "AI";
+    const spkInfo = this.getSpeakerInfo(displaySpeakerId);
 
-    const isFinal = data.isFinal || data.is_final;
+    // 2. LİQUİD EKRANA BASMA
+    this.activeSpeakerEl.innerText = isUser ? spkInfo.name : "🤖 YAPAY ZEKA";
+    this.activeSpeakerEl.style.color = isUser
+      ? spkInfo.color
+      : "var(--theme-color)";
+
+    this.activeTextEl.innerText = data.text || data.text_chunk || "...";
+
+    if (isUser) {
+      this.activeTextEl.className = isFinal
+        ? "subtitle-text"
+        : "subtitle-text partial";
+    } else {
+      this.activeTextEl.className = isFinal
+        ? "subtitle-text"
+        : "subtitle-text ai-typing";
+    }
+
+    // 3. GELİŞTİRİCİ METRİKLERİ
+    if (this.devModeActive && this.metricsDataEl) {
+      const v = data.speaker_vec || [];
+      this.metricsDataEl.innerHTML = `
+         <b>Mode:</b> ${isUser ? "Listening" : "Synthesizing"}<br>
+         <b>Spk ID:</b> ${this.lockedSpeakerId} (Raw: ${rawSpeakerId})<br>
+         <b>Emotion:</b> ${data.emotion || "neutral"} <br>
+         <b>Arousal:</b> ${data.arousal?.toFixed(2)}<br>
+         <b>Valence:</b> ${data.valence?.toFixed(2)}<br>
+         <b>Vec[0]:</b> ${v[0]?.toFixed(2)}<br>
+         <b>Vec[1]:</b> ${v[1]?.toFixed(2)}
+      `;
+    }
+
+    // 4. KİLİT AÇMA VE TEMİZLİK
     if (isFinal) {
-      rowEl.removeAttribute("id");
-      msgEl.classList.remove("partial");
+      this.lockedSpeakerId = null;
 
-      if (this.devModeActive) {
-        this.shadow.querySelector("#metricsData")!.innerHTML =
-          `<b>Spk ID:</b> ${speakerId}<br>
-           <b>Cinsiyet:</b> ${gender}<br>
-           <b>Duygu:</b> ${emotion} <br>
-           <b>Arousal:</b> ${data.arousal?.toFixed(2)}<br>
-           <b>Valence:</b> ${data.valence?.toFixed(2)}`;
+      // AI cümleyi bitirdiyse ve arkasından hemen kullanıcı konuşmadıysa temizle
+      if (!isUser) {
+        const currentText = this.activeTextEl.innerText;
+        setTimeout(() => {
+          if (
+            !this.lockedSpeakerId &&
+            this.activeTextEl?.innerText === currentText
+          ) {
+            this.activeTextEl.innerText = "Sizi dinliyor...";
+            this.activeTextEl.className = "subtitle-text partial";
+            if (this.activeSpeakerEl) {
+              this.activeSpeakerEl.innerText = "SİSTEM";
+              this.activeSpeakerEl.style.color = "var(--theme-color)";
+            }
+          }
+        }, 2000);
       }
     }
-    this.transcriptBox.scrollTo({
-      top: this.transcriptBox.scrollHeight,
-      behavior: "smooth",
-    });
   }
 
-  // [YENİ]: Deep Waters Visualizer
   private handleStatusUpdate(statusStr: string) {
     try {
       const status = JSON.parse(statusStr);
+      if (status.type === "MOOD_SHIFT" && this.liquidBar) {
+        let glowColor = "transparent";
+        if (status.new_mood === "angry") glowColor = "#ef4444";
+        else if (status.new_mood === "excited") glowColor = "#f59e0b";
+        else if (status.new_mood === "sad") glowColor = "#3b82f6";
 
-      if (status.type === "MOOD_SHIFT") {
-        console.log(
-          `🌊 [DEEP WATERS TRIGGERED]: Kullanıcı ruh hali değişti! Yeni Mod: ${status.new_mood} (Shift: ${status.arousal_shift.toFixed(2)})`,
-        );
+        this.liquidBar.style.setProperty("--glow-color", glowColor);
 
-        // Ekranda Developer Metrics açıksa (Gözlemci modu) oraya bildirim basalım
-        if (this.transcriptBox) {
-          const shiftId = `shift-${Date.now()}`;
-          const color =
-            status.new_mood === "angry"
-              ? "#ef4444"
-              : status.new_mood === "excited"
-                ? "#f59e0b"
-                : "#3b82f6";
-          const emoji =
-            status.new_mood === "angry"
-              ? "😡"
-              : status.new_mood === "excited"
-                ? "🤩"
-                : "🧘";
-
-          const alertHtml = `
-            <div id="${shiftId}" style="background: rgba(15, 23, 42, 0.8); border: 1px solid ${color}; color: ${color}; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 11px; font-family: monospace; animation: pulse 1s infinite; text-align: center;">
-              ${emoji} AKUSTİK ANOMALİ: Ruh hali <b>${status.new_mood.toUpperCase()}</b> olarak değişti! (Fark: ${status.arousal_shift.toFixed(2)})
-            </div>
-          `;
-
-          this.transcriptBox.insertAdjacentHTML("beforeend", alertHtml);
-          this.transcriptBox.scrollTo({
-            top: this.transcriptBox.scrollHeight,
-            behavior: "smooth",
-          });
-
-          // 4 saniye sonra yanıp sönmeyi (pulse) durdur
-          setTimeout(() => {
-            const el = this.transcriptBox?.querySelector(
-              `#${shiftId}`,
-            ) as HTMLElement;
-            if (el) el.style.animation = "none";
-          }, 4000);
+        if (this.activeTextEl) {
+          this.activeTextEl.innerText = `[Bilişsel Anomali Algılandı: ${status.new_mood.toUpperCase()}]`;
+          this.activeTextEl.className = "subtitle-text partial";
         }
+
+        setTimeout(() => {
+          if (this.liquidBar)
+            this.liquidBar.style.setProperty("--glow-color", "transparent");
+        }, 5000);
       }
-    } catch (e) {
-      console.error("Status parse error", e);
+    } catch (_e) {
+      // JSON parse hatasını yoksay
     }
   }
 
   private updateUI() {
     const btn = this.shadow.querySelector("#actionBtn") as HTMLElement;
-    btn.classList.toggle("active", this.isActive);
+    if (btn) {
+      btn.classList.toggle("active", this.isActive);
 
-    // Gözlemci Modu ise İkonu değiştir
-    if (this.isActive && this.isListenOnly) {
-      btn.innerHTML = "<span>👁️</span>";
-    } else {
-      btn.innerHTML = this.isActive ? "<span>✕</span>" : "<span>🎤</span>";
+      if (this.isActive && this.isListenOnly) {
+        btn.innerHTML = "<span>👁️</span>";
+      } else {
+        btn.innerHTML = this.isActive ? "<span>✕</span>" : "<span>🎤</span>";
+      }
     }
   }
 }
