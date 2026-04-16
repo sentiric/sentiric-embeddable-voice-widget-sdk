@@ -204,5 +204,10 @@ export class SentiricStreamClient {
     if (!this.isReady || !this.ws) return;
     const msg = StreamSessionRequest.fromPartial({ textMessage: text });
     this.ws.send(StreamSessionRequest.encode(msg).finish());
+
+    // [CRITICAL FIX]: Metin gönderildikten hemen sonra cümlenin bittiğini (EOS) bildir.
+    // Bu sayede Dialog Service beklemeyi bırakıp LLM'i anında tetikler!
+    const eosMsg = StreamSessionRequest.fromPartial({ control: { event: 2 } });
+    this.ws.send(StreamSessionRequest.encode(eosMsg).finish());
   }
 }

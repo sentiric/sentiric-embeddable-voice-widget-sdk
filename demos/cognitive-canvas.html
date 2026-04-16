@@ -127,9 +127,10 @@
             });
             await earClient.start();
 
+            const originalStop = client.stop.bind(client);
             client.stop = () => {
-                client.ws?.close();
-                earClient.stop();
+                originalStop(); // Beynin QA Raporunu bassın
+                earClient.stop(); // Kulağın QA Raporunu bassın
             };
 
             micBtn.classList.add('active');
@@ -190,17 +191,24 @@
             const text = data.text || data.text_chunk || "";
 
             if (isFinal) {
-                const factStr = text.trim();
+                // [YENİ] LLM'in ne düşündüğünü konsolda görelim!
+                console.log("🧠 BEYİN (LLM) ANALİZİ:", text); 
                 
-                if (factStr === "NONE" || factStr.includes("NONE") || !factStr.includes("|")) return;
+                const factStr = text.trim();
+                if (factStr === "NONE" || factStr.includes("NONE")) return;
 
                 let topic = "Bilişsel Çıkarım";
                 let fact = factStr;
 
-                const parts = factStr.split("|");
-                if (parts.length >= 2) {
+                // LLM '|' veya ':' kullanmış olabilir, ikisini de yakala!
+                if (factStr.includes("|")) {
+                    const parts = factStr.split("|");
                     topic = parts[0].trim();
                     fact = parts.slice(1).join("|").trim();
+                } else if (factStr.includes(":")) {
+                    const parts = factStr.split(":");
+                    topic = parts[0].trim();
+                    fact = parts.slice(1).join(":").trim();
                 }
 
                 createMemoryCard(topic, fact, window.lastEmotion || "neutral", window.lastSpkColor || "#3B82F6");
@@ -211,22 +219,25 @@
             try {
                 const status = JSON.parse(statusStr);
                 if (status.type === "MOOD_SHIFT") {
+                    // [YENİ]: Sadece çok ciddi değişimleri 'Reflex Anomaly' olarak işaretle
+                    const isAnomaly = Math.abs(status.arousal_shift) > 0.4 || status.new_mood === 'angry';
+                    
                     const card = document.createElement('div');
                     card.className = 'memory-card';
-                    card.style.background = 'rgba(239, 68, 68, 0.05)';
-                    card.style.borderColor = '#ef4444';
+                    card.style.background = isAnomaly ? 'rgba(239, 68, 68, 0.05)' : 'rgba(59, 130, 246, 0.05)';
+                    card.style.borderColor = isAnomaly ? '#ef4444' : '#3b82f6';
                     card.style.borderLeftWidth = '4px';
                     
-                    const emo = status.new_mood === 'angry' ? '😡' : '🤩';
+                    const emo = status.new_mood === 'angry' ? '😡' : (status.new_mood === 'excited' ? '🤩' : '😐');
+                    const title = isAnomaly ? '🚨 BİLİŞSEL REFLEKS TETİKLENDİ' : '📊 DUYGU DURUMU GÜNCELLENDİ';
 
                     card.innerHTML = `
-                        <div class="card-header" style="color:#ef4444">
-                            <span>🚨 BİLİŞSEL REFLEKS TETİKLENDİ</span>
+                        <div class="card-header" style="color:${isAnomaly ? '#ef4444' : '#3b82f6'}">
+                            <span>${title}</span>
                             <span>${emo}</span>
                         </div>
-                        <div class="card-body" style="color:#fca5a5; font-size:13px;">
-                            Kullanıcının ruh hali aniden <b>${status.new_mood.toUpperCase()}</b> moduna geçti. (Şiddet: ${status.arousal_shift.toFixed(2)})<br><br>
-                            <i>*Bu anomali Crystalline servisi tarafından tespit edildi. Dialog servisine "Terapist Moduna Geç" emri iletildi.*</i>
+                        <div class="card-body" style="color:${isAnomaly ? '#fca5a5' : '#93c5fd'}; font-size:13px;">
+                            Kullanıcının ruh hali aniden <b>${status.new_mood.toUpperCase()}</b> moduna geçti. (Değişim: ${status.arousal_shift.toFixed(2)})
                         </div>
                     `;
                     grid.prepend(card);
