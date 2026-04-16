@@ -1,4 +1,4 @@
-// [ARCH-COMPLIANCE FIX]: sentiric-stream-sdk/src/core/audio-manager.ts
+// File: src/core/audio-manager.ts
 import { AUDIO_WORKLET_CODE } from "./audio-processor-worklet";
 import { Logger } from "../utils/logger";
 
@@ -36,7 +36,6 @@ export class SentiricAudioManager {
   public setAiSpeaking(active: boolean) {
     this.isAiSpeaking = active;
     if (active) {
-      // [MİMARİ DÜZELTME]: Yankı (Echo) ve Self-Noise Koruması (5 Kat Sağırlaştırma)
       this.vadThreshold = this.BASE_THRESHOLD * 5.0;
       this.vadPauseTime = 800;
     } else {
@@ -86,7 +85,7 @@ export class SentiricAudioManager {
       };
 
       this.sourceNode.connect(this.workletNode);
-      Logger.info("MIC_STARTED", "Dynamic VAD Engine initialized.");
+      Logger.debug("MIC_STARTED", "Dynamic VAD Engine initialized.");
     } catch (err) {
       Logger.error("MIC_ERROR", "Microphone access failed", { error: err });
       throw err;
@@ -103,7 +102,7 @@ export class SentiricAudioManager {
         this.speechFramesCount >= this.SPEECH_FRAMES_REQUIRED
       ) {
         this.isSpeaking = true;
-        Logger.info(
+        Logger.debug(
           "VAD_SPEECH_START",
           "Speech detected. Mode: " +
             (this.isAiSpeaking ? "Barge-in" : "Normal"),
@@ -121,7 +120,7 @@ export class SentiricAudioManager {
         Date.now() - this.lastSpkTime > this.vadPauseTime
       ) {
         this.isSpeaking = false;
-        Logger.info("VAD_SPEECH_STOP", "User silent. Sending EOS to server.");
+        Logger.debug("VAD_SPEECH_STOP", "User silent. Sending EOS to server.");
         this.onEos();
       }
       if (this.isSpeaking) {
@@ -162,7 +161,7 @@ export class SentiricAudioManager {
         this.schedulePlayback(float32Buffer);
       }
     } catch {
-      // Linter error avoided by not binding error variable
+      // Linter error avoided
     }
   }
 

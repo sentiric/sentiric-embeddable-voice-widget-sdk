@@ -16,7 +16,6 @@
         
         .workspace { display: flex; flex: 1; overflow: hidden; }
         
-        /* SOL: Transkript Akışı */
         .transcript-pane { width: 35%; border-right: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; background: var(--bg); }
         .pane-title { padding: 12px 20px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.05); background: var(--panel); }
         .feed { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth;}
@@ -26,7 +25,6 @@
         .turn-text { font-size: 15px; line-height: 1.6; color: #d4d4d8; }
         .turn-text.partial { opacity: 0.5; font-style: italic; }
         
-        /* SAĞ: Zihin Haritası (Canvas) */
         .canvas-pane { width: 65%; background: radial-gradient(circle at center, #18181b 0%, #09090b 100%); padding: 30px; overflow-y: auto; position: relative; }
         
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
@@ -101,7 +99,7 @@
                 client?.stop();
                 micBtn.classList.remove('active');
                 liveInd.classList.remove('active');
-                feed.innerHTML += `<div style="text-align:center; color:var(--muted); margin-top: 20px; font-size: 12px;">Oturum Sonlandırıldı.</div>`;
+                feed.innerHTML += `<div style="text-align:center; color:var(--muted); margin-top: 20px; font-size: 12px;">Oturum Sonlandırıldı. Konsolu Kontrol Edin (QA Raporu).</div>`;
                 isRunning = false;
                 return;
             }
@@ -113,29 +111,22 @@
                 gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
                 tenantId: "demo-tenant",
                 language: "tr-TR",
-                
-                // [MİMARİ DEVRİM]: Artık "Listen Only" (Sadece Dinle) modunda DEĞİLİZ!
-                // Chat-Only modundayız. Çünkü LLM'den "Zihin Haritası" cevabı almak istiyoruz.
-                // STT ve TTS bypass ediliyor, sadece Text gidiş-geliş var.
-                // SES İŞLEME İÇİN 2. BİR İSTEMCİ AÇIYORUZ (Aşağıda)
+                chatOnlyMode: true 
             });
 
-            // 1. Zihin Haritası için Sessiz LLM Bağlantısı (Arka kapı)
             await client.start();
             client.options.onTranscript = handleBrainResponse;
 
-            // 2. Senin Sesini Dinleyen Ana Kulak Bağlantısı (Sadece Dinle)
             const earClient = new SentiricStreamClient({
                 gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
                 tenantId: "demo-tenant",
                 language: "tr-TR",
-                listenOnlyMode: true, // Kulak sadece dinler
-                onTranscript: (data) => handleUserAudio(data, client), // Duyduğunu beyne yollar
+                listenOnlyMode: true,
+                onTranscript: (data) => handleUserAudio(data, client), 
                 onStatusUpdate: handleMoodShift
             });
             await earClient.start();
 
-            // Kapatırken ikisini de kapatsın diye Client'ı hackliyoruz
             client.stop = () => {
                 client.ws?.close();
                 earClient.stop();
@@ -149,18 +140,15 @@
         let lockedSpeakerId = null;
         let activeTurnEl = null;
 
-        // KULAK: Senin sesini dinleyip metne çeviren bölüm
         function handleUserAudio(data, brainClient) {
             const isFinal = data.isFinal || data.is_final;
             const text = data.text || data.text_chunk || "";
             const rawSpkId = data.speakerId || data.speaker_id || "?";
             const emotion = data.emotion || "neutral";
 
-            // Flicker Koruması (Speaker Lock-in)
             if (!lockedSpeakerId) lockedSpeakerId = rawSpkId;
             const color = getSpkColor(lockedSpeakerId);
 
-            // Sol Taraf: Transkript (Değişmedi, harika çalışıyor)
             if (!activeTurnEl) {
                 const turnDiv = document.createElement('div');
                 turnDiv.className = 'turn';
@@ -182,29 +170,20 @@
                 textEl.classList.remove('partial');
                 activeTurnEl = null; 
                 
-                // [SİHİR BURADA BAŞLIYOR]: Eğer cümle çok kısaysa LLM'i yorma (Tasarruf)
-                if (text.split(' ').length > 3) { 
-                    
-                    // LLM'e (BrainClient) gizli bir prompt atıyoruz.
-                    // "Bana cevap verme, sadece bu cümleyi Zihin Haritası formatında JSON olarak dön!"
-                    const stealthPrompt = `[SYSTEM_OVERRIDE]: Şu andan itibaren sen bir konuşma asistanı değilsin. Sen bir 'Bilişsel Çıkarım Motoru'sun. Aşağıdaki cümleyi analiz et. Eğer cümle sıradan bir sohbettiyse (Örn: 'Nasılsın', 'Evet') sadece 'NONE' yaz. Eğer cümle içinde bir duygu, mantıksal bir çıkarım, bir bilgi veya bir şikayet barındırıyorsa, bunu şu formatta yaz: TOPIC|FACT (Örn: Çelişki Sorgulaması|Kullanıcı amcası olmayan bir çocuğu sorguluyor). Cümle: "${text}"`;
+                if (text.split(' ').length > 3 && !text.includes("[SYSTEM")) { 
+                    const stealthPrompt = `[SYSTEM_OVERRIDE_COGNITIVE_EXTRACTOR]: Sen bir 'Bilişsel Çıkarım Motoru'sun. Asla sohbet etme, selamlama yapma! Aşağıdaki cümleyi analiz et. Eğer cümle sıradan bir sohbettiyse (Örn: 'Nasılsın', 'Evet') sadece 'NONE' yaz. Eğer cümle içinde bir duygu, mantıksal bir çıkarım, bir bilgi veya bir şikayet barındırıyorsa, BUNU ŞU KATI FORMATTA YAZ: TOPIC|FACT (Örn: İhtiyaç Belirtimi|Kullanıcı sistemin yavaşlığından şikayet ediyor). Cümle: "${text}"`;
                     
                     brainClient.sendText(stealthPrompt);
                     
-                    // Not: Bu cümlenin kime ait olduğunu (Rengi vb) hafızada tutmalıyız ki, 
-                    // LLM cevabı döndüğünde kartı doğru renge boyayalım. 
-                    // (Şimdilik global değişkene atalım, basit kalsın)
                     window.lastSpkColor = color;
                     window.lastEmotion = emotion;
                 }
-                lockedSpeakerId = null; // Kilit açıldı
+                lockedSpeakerId = null;
             }
             feed.scrollTop = feed.scrollHeight;
         }
 
-        // BEYİN: LLM'den gelen Zihin Haritası (Fact) cevaplarını ekrana basan bölüm
         function handleBrainResponse(data) {
-            // Sadece AI'ın cevaplarını (Zihin Haritası dökümünü) al
             if (data.sender !== "AI") return;
 
             const isFinal = data.isFinal || data.is_final;
@@ -213,39 +192,19 @@
             if (isFinal) {
                 const factStr = text.trim();
                 
-                // LLM "Bu cümleden bir şey çıkmaz" (NONE) dediyse kart yaratma!
-                if (factStr === "NONE" || factStr.includes("NONE")) return;
+                if (factStr === "NONE" || factStr.includes("NONE") || !factStr.includes("|")) return;
 
-                // Beklenen format: "TOPIC|FACT"
                 let topic = "Bilişsel Çıkarım";
                 let fact = factStr;
 
-                if (factStr.includes("|")) {
-                    const parts = factStr.split("|");
+                const parts = factStr.split("|");
+                if (parts.length >= 2) {
                     topic = parts[0].trim();
-                    fact = parts[1].trim();
+                    fact = parts.slice(1).join("|").trim();
                 }
 
                 createMemoryCard(topic, fact, window.lastEmotion || "neutral", window.lastSpkColor || "#3B82F6");
             }
-        }
-
-        // Sağ Taraf: Hafıza Kartı Üretici (Artık Hardcode Değil, Saf Zeka!)
-        function createMemoryCard(topic, fact, emotion, color) {
-            const card = document.createElement('div');
-            card.className = 'memory-card';
-            card.style.borderLeft = `3px solid ${color}`;
-            
-            const emoColor = emotion === 'angry' ? '#ef4444' : emotion === 'excited' ? '#f59e0b' : color;
-
-            card.innerHTML = `
-                <div class="card-header">
-                    <span style="color:${color}">● ${topic}</span>
-                    <span style="color:${emoColor}">${emotion}</span>
-                </div>
-                <div class="card-body">"${fact}"</div>
-            `;
-            grid.prepend(card);
         }
 
         function handleMoodShift(statusStr) {

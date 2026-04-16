@@ -1,4 +1,4 @@
-// [ARCH-COMPLIANCE FIX]: sentiric-stream-sdk/src/core/stream-client.ts
+// File: src/core/stream-client.ts
 import {
   StreamSessionRequest,
   StreamSessionResponse,
@@ -44,6 +44,7 @@ export class SentiricStreamClient {
   private options: StreamClientOptions;
   private isReady: boolean = false;
   private audioManager: SentiricAudioManager | null = null;
+  private qaLog: any[] = []; // QA Analizleri için Kara Kutu
 
   public readonly traceId: string;
   public readonly sessionId: string;
@@ -135,6 +136,27 @@ export class SentiricStreamClient {
         if (message.transcript.sender === "AI" && message.transcript.isFinal) {
           this.audioManager?.setAiSpeaking(false);
         }
+
+        // --- QA RECORDER ---
+        if (
+          message.transcript.isFinal ||
+          (message.transcript as any).is_final
+        ) {
+          this.qaLog.push({
+            timestamp: new Date().toISOString(),
+            speaker: message.transcript.sender,
+            speaker_id:
+              message.transcript.speakerId ||
+              (message.transcript as any).speaker_id ||
+              "?",
+            emotion: message.transcript.emotion || "neutral",
+            text:
+              message.transcript.text ||
+              (message.transcript as any).text_chunk ||
+              "",
+          });
+        }
+
         if (this.options.onTranscript)
           this.options.onTranscript(message.transcript);
       } else if (message.clearAudioBuffer) {
@@ -154,6 +176,12 @@ export class SentiricStreamClient {
     this.ws?.close();
     this.audioManager?.stop();
     Logger.info("SESSION_STOPPED", "User ended session.");
+
+    // QA ANALİZ ÇIKTISI
+    console.log("\n==================================================");
+    console.log("🧠 QA TEST REPORT (KOPYALAYIP AI'A GÖNDERİN):");
+    console.log(JSON.stringify(this.qaLog, null, 2));
+    console.log("==================================================\n");
   }
 
   public async start(): Promise<void> {
@@ -165,7 +193,6 @@ export class SentiricStreamClient {
     );
     await this.connect();
 
-    // [MİMARİ DÜZELTME]: Megafon modunda (speakOnlyMode) mikrofon isteme!
     if (!this.options.chatOnlyMode && !this.options.speakOnlyMode) {
       await this.audioManager.startMicrophone();
     }

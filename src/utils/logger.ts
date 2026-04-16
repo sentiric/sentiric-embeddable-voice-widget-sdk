@@ -1,13 +1,9 @@
-/**
- * Sentiric Logger for SDK
- * Geliştirici dostu (Pretty Print) ve SUTS v4.0 (JSON) uyumlu logger.
- */
+// File: src/utils/logger.ts
 export class Logger {
   private static tenantId: string = "unknown";
   private static traceId: string | null = null;
   private static sessionId: string | null = null;
 
-  // [YENİ] Konsolu kirletmemek için Pretty Print modu.
   public static debugMode: boolean = true;
 
   static setContext(tenantId: string, traceId: string, sessionId: string) {
@@ -34,6 +30,7 @@ export class Logger {
       let color = "color: #3b82f6; font-weight: bold;";
       if (severity === "WARN") color = "color: #f59e0b; font-weight: bold;";
       if (severity === "ERROR") color = "color: #ef4444; font-weight: bold;";
+      if (severity === "DEBUG") color = "color: #94a3b8; font-weight: normal;";
 
       console.log(
         `%c[${time}] [${severity}] [${event}]%c ${message}`,
@@ -51,7 +48,7 @@ export class Logger {
       tenant_id: this.tenantId,
       resource: {
         "service.name": "sentiric-stream-sdk",
-        "service.version": "0.1.17",
+        "service.version": "0.3.x",
         "service.env": "production",
       },
       trace_id: this.traceId,
@@ -71,5 +68,8 @@ export class Logger {
   }
   static error(event: string, message: string, attrs: any = {}) {
     this.log("ERROR", event, message, attrs);
+  }
+  static debug(event: string, message: string, attrs: any = {}) {
+    this.log("DEBUG", event, message, attrs);
   }
 }
