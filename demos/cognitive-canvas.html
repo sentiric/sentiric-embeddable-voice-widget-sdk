@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognitive Canvas | Sentiric OS</title>
+    <style>
+        :root { --bg: #09090b; --panel: #18181b; --accent: #3b82f6; --text: #f4f4f5; --muted: #a1a1aa; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        .header { padding: 15px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; background: var(--panel); z-index: 10;}
+        .header-title { font-weight: 700; font-size: 16px; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
+        .header-title span { color: var(--accent); }
+        .live-indicator { width: 10px; height: 10px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981; animation: pulse 2s infinite; display: none; }
+        .live-indicator.active { display: block; }
+        
+        .workspace { display: flex; flex: 1; overflow: hidden; }
+        
+        /* SOL: Transkript Akışı */
+        .transcript-pane { width: 35%; border-right: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; background: var(--bg); }
+        .pane-title { padding: 12px 20px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.05); background: var(--panel); }
+        .feed { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth;}
+        
+        .turn { display: flex; flex-direction: column; gap: 6px; animation: fadeIn 0.3s ease; }
+        .turn-meta { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; letter-spacing: 1px;}
+        .turn-text { font-size: 15px; line-height: 1.6; color: #d4d4d8; }
+        .turn-text.partial { opacity: 0.5; font-style: italic; }
+        
+        /* SAĞ: Zihin Haritası (Canvas) */
+        .canvas-pane { width: 65%; background: radial-gradient(circle at center, #18181b 0%, #09090b 100%); padding: 30px; overflow-y: auto; position: relative; }
+        
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
+        .memory-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; backdrop-filter: blur(10px); transition: 0.3s; animation: slideUp 0.4s ease;}
+        .memory-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.3);}
+        .card-header { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;}
+        .card-body { font-size: 14px; line-height: 1.6; color: #e4e4e7;}
+        
+        .control-bar { padding: 20px; background: var(--panel); border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: center; }
+        .mic-btn { width: 64px; height: 64px; border-radius: 50%; background: var(--text); color: var(--bg); border: none; font-size: 24px; cursor: pointer; transition: 0.3s; display: grid; place-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3);}
+        .mic-btn.active { background: #ef4444; color: white; box-shadow: 0 0 25px rgba(239, 68, 68, 0.5); }
+        .mic-btn.active::after { content: ""; position: absolute; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #ef4444; animation: ping 1.5s infinite; }
+        
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes ping { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.5); opacity: 0; } }
+    </style>
+  <script type="module" crossorigin src="../cognitive.js"></script>
+  <link rel="modulepreload" crossorigin href="../assets/modulepreload-polyfill-CNgwewHt.js">
+  <link rel="modulepreload" crossorigin href="../stream-sdk.js">
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-title">🧠 <span>COGNITIVE</span> CANVAS <div class="live-indicator" id="liveInd"></div></div>
+        <a href="../index.html" style="color:var(--muted); text-decoration:none; font-size: 12px; font-weight:600;">&larr; Vitrine Dön</a>
+    </div>
+
+    <div class="workspace">
+        <div class="transcript-pane">
+            <div class="pane-title">SENSORY INPUT (İŞİTSEL KORTEKS)</div>
+            <div class="feed" id="feed">
+                <div style="text-align:center; color:var(--muted); margin-top: 40px; font-size: 13px;">Bağlantı bekleniyor...</div>
+            </div>
+            <div class="control-bar">
+                <button class="mic-btn" id="micBtn" title="Zihne Bağlan">🎤</button>
+            </div>
+        </div>
+
+        <div class="canvas-pane">
+            <div class="pane-title" style="border:none; padding:0; margin-bottom: 10px;">SHORT-TERM MEMORY (ZİHİN HARİTASI)</div>
+            <div style="color:var(--muted); font-size:13px; max-width:700px; line-height: 1.5;">
+                Daldan dala atlayarak, dağınık şekilde konuşun. Whisper sizi ayırır, duygularınızı ölçer ve burada "Anlık Hafıza Kartları" oluşturur. (Bir sonraki aşamada bu harita kalıcı olarak Qdrant'a vektörlenecektir).
+            </div>
+            
+            <div class="card-grid" id="memoryGrid">
+                <!-- Kartlar -->
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
