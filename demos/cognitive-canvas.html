@@ -481,22 +481,44 @@
                 activeTurnEl = null;
 
                 if (text.split(' ').length > 3 && !text.includes("[SYSTEM")) {
-                    const stealthPrompt = `[SYSTEM_OVERRIDE_COGNITIVE_EXTRACTOR]: Sen bir 'Evrensel Bilişsel Gözlemci' (Universal Cognitive Observer) motorusun. 
-Görevin, daldan dala atlayan insan konuşmalarını dinleyip içindeki 'Kritik Bilgi Özlerini' çıkarmaktır.
+                    console.log("Final metin beyne gönderiliyor:", text);
+                    const stealthPrompt = `
+# ROLE: UNIVERSAL COGNITIVE EXTRACTOR (v6.0 - Ultimate)
+Görevin: Metni analiz et ve aşağıdaki 15 KESİN ATOMİK kategoriden en uygun olanı seçerek JSON üret.
 
-Konu kısıtlaman yok! Analiz ettiğin cümleye göre kategoriyi (Topic) KENDİN BELİRLE.
-Örnek Çeşitliliği:
-- 'Teknik Fikir | Kullanıcı paslanmaz çelik yerine karbon fiber kullanmayı öneriyor.'
-- 'Kişisel Hafıza | Kullanıcının amcası olmadığını ve çocukluk anılarını tartışıyor.'
-- 'İş Planı | Yarın sabah saat 10:00'da ekip toplantısı yapılacakmış.'
-- 'Felsefi Sorgulama | Herkesin hata yapabileceği gerçeği üzerine mantık yürütüyor.'
-- 'Duygusal İtiraf | Kullanıcı son zamanlarda projenin hızından dolayı stresli hissediyor.'
-- 'Bilimsel Not | Kuantum dolanıklığı ile veri iletimi üzerine sesli düşünüyor.'
+### KESİN KATEGORİ LİSTESİ:
+- Yazılım & Kodlama
+- Donanım & Cihazlar
+- Kişisel Bilgiler
+- Günlük Rutinler
+- Felsefi Görüşler
+- Psikolojik Durum
+- Gelecek Hedefleri
+- Sosyal İlişkiler
+- Finans & Yatırım
+- Sağlık
+- Spor & Aktivite
+- Hobiler & Sanat
+- Yapay Zeka
+- Eğitim & Öğrenme
+- İş & Kariyer
 
-Sadece şu formatta yaz: Kategori | Çıkarılan Gerçek Özeti.
-Eğer cümle sadece "nasılsın, tamam, evet" gibi derinliği olmayan bir sohbettiyse sadece NONE yaz.
-METİN: "${text}"`;
+### KURALLAR:
+1. SADECE yukarıdaki listeden bir kategori seç. Kendi kategorini üretme.
+2. Metin sadece nezaket cümleleri (selam, tşk) içeriyorsa SADECE "NONE" yaz.
+3. Çıktı formatı kesinlikle saf JSON olmalıdır.
+4. 'summary' kısmını 3. tekil şahıs ("Kullanıcı...") olarak, yorum katmadan yaz.
 
+### ÇIKTI FORMATI:
+{
+  "category": "Kategori Adı",
+  "summary": "Kullanıcı perspektifinden kısa ve net gerçek.",
+  "importance": 1-5,
+  "metadata": "Spesifik anahtar kelimeler, markalar, kod parçacıkları veya isimler"
+}
+
+METİN: "${text}"
+`;
                     brainClient.sendText(stealthPrompt);
 
                     window.lastSpkColor = color;
@@ -511,49 +533,58 @@ METİN: "${text}"`;
 
         function handleBrainResponse(data) {
             if (data.sender !== "AI") return;
-            const text = data.text || data.text_chunk || "";
+            const rawText = (data.text || data.text_chunk || "").trim();
 
-            // Ekranda daktilo efektiyle göster
             llmBox.classList.add('active');
-            llmText.innerText = text;
+            llmText.innerText = rawText;
 
-            // Her yeni harf geldiğinde sayacı sıfırla
             clearTimeout(aiTypingTimeout);
 
-            // Eğer 1.5 saniye boyunca yeni harf gelmezse, LLM cümlenin sonuna gelmiştir!
             aiTypingTimeout = setTimeout(() => {
-                llmBox.classList.remove('active'); // Kutuyu gizle
+                llmBox.classList.remove('active');
 
-                const factStr = text.trim();
+                if (rawText === "NONE" || rawText.includes("NONE")) return;
 
-                // Eğer LLM "NONE" dediyse veya format uymuyorsa kart basma
-                if (factStr === "NONE" || factStr.includes("NONE") || (!factStr.includes("|") && !factStr.includes(":"))) {
-                    return;
+                try {
+                    // --- TEMİZLEME OPERASYONU BAŞLAR ---
+                    // 1. Markdown bloklarını (```json ve ```) temizle
+                    let cleanText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+
+                    // 2. Eğer JSON başında/sonunda ekstra metin varsa sadece { ... } arasını al
+                    const firstBracket = cleanText.indexOf('{');
+                    const lastBracket = cleanText.lastIndexOf('}');
+
+                    if (firstBracket !== -1 && lastBracket !== -1) {
+                        cleanText = cleanText.substring(firstBracket, lastBracket + 1);
+                    }
+                    // --- TEMİZLEME OPERASYONU BİTTİ ---
+
+                    const memory = JSON.parse(cleanText);
+
+                    // Kartı Çizme Mantığı
+                    const card = document.createElement('div');
+                    card.className = 'memory-card';
+
+                    const importanceColors = ["#a1a1aa", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
+                    const accentColor = importanceColors[memory.importance - 1] || "#3b82f6";
+
+                    card.style.borderLeft = `4px solid ${accentColor}`;
+                    card.innerHTML = `
+                        <div class="card-header" style="color:${accentColor}">
+                            <span>● ${memory.category.toUpperCase()}</span>
+                            <span style="opacity:0.6">ÖNEM: ${memory.importance}/5</span>
+                        </div>
+                        <div class="card-body">"${memory.summary}"</div>
+                        ${memory.metadata ? `<div style="font-size:10px; color:var(--muted); margin-top:8px; border-top:1px solid rgba(255,255,255,0.05); pt-4">Not: ${memory.metadata}</div>` : ''}
+                    `;
+                    grid.prepend(card);
+
+                } catch (e) {
+                    console.error("Hafıza hala parse edilemedi. Gelen ham veri:", rawText);
+                    console.error("Hata detayı:", e);
                 }
 
-                // Format parçalayıcı ( | veya : )
-                const separator = factStr.includes("|") ? "|" : ":";
-                const parts = factStr.split(separator);
-
-                // Prompt'tan sızabilecek "TOPIC" veya "FACT" kelimelerini UI'da da temizle
-                let topic = parts[0].replace(/TOPIC|Kategori/gi, "").replace(/:/g, "").trim();
-                let fact = parts.slice(1).join(separator).replace(/FACT|Gerçek/gi, "").replace(/:/g, "").trim();
-
-                if (!topic) topic = "Bilişsel Çıkarım";
-
-                // Kalıcı Kartı Çiz
-                const card = document.createElement('div');
-                card.className = 'memory-card';
-                card.style.borderLeft = `3px solid ${window.lastSpkColor || "#10B981"}`;
-                card.innerHTML = `
-                    <div class="card-header" style="color:${window.lastSpkColor || "#10B981"}">
-                        <span>● ${topic}</span>
-                    </div>
-                    <div class="card-body">"${fact}"</div>
-                `;
-                grid.prepend(card);
-
-            }, 1500); // 1.5 saniye sessizlik = Cümle bitti.
+            }, 1500);
         }
 
         function handleMoodShift(statusStr) {
