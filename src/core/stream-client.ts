@@ -137,7 +137,7 @@ export class SentiricStreamClient {
           this.audioManager?.setAiSpeaking(false);
         }
 
-        // --- QA RECORDER ---
+        // QA RECORDER
         if (
           message.transcript.isFinal ||
           (message.transcript as any).is_final
@@ -157,16 +157,25 @@ export class SentiricStreamClient {
           });
         }
 
-        if (this.options.onTranscript)
-          this.options.onTranscript(message.transcript);
+        // [ARCH-COMPLIANCE FIX]: UI Callback hatalarını Protobuf hatasından izole et.
+        try {
+          if (this.options.onTranscript)
+            this.options.onTranscript(message.transcript);
+        } catch (cbErr) {
+          Logger.error("UI_RENDER_ERROR", "Error inside UI callback", {
+            error: cbErr,
+          });
+        }
       } else if (message.clearAudioBuffer) {
         this.audioManager?.flushPlayback();
       } else if (message.statusUpdate) {
-        if (this.options.onStatusUpdate) {
-          this.options.onStatusUpdate(message.statusUpdate);
-        }
+        try {
+          if (this.options.onStatusUpdate)
+            this.options.onStatusUpdate(message.statusUpdate);
+        } catch (cbErr) {}
       }
     } catch (e) {
+      // Bu sadece GERÇEK Protobuf parse hatalarında tetiklenecek.
       Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });
     }
   }

@@ -16,6 +16,7 @@
         
         .workspace { display: flex; flex: 1; overflow: hidden; }
         
+        /* SOL EKRAN (Kulak) */
         .transcript-pane { width: 35%; border-right: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; background: var(--bg); }
         .pane-title { padding: 12px 20px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.05); background: var(--panel); }
         .feed { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth;}
@@ -25,9 +26,19 @@
         .turn-text { font-size: 15px; line-height: 1.6; color: #d4d4d8; }
         .turn-text.partial { opacity: 0.5; font-style: italic; }
         
-        .canvas-pane { width: 65%; background: radial-gradient(circle at center, #18181b 0%, #09090b 100%); padding: 30px; overflow-y: auto; position: relative; }
+        /* SAĞ EKRAN (Beyin) */
+        .canvas-pane { width: 65%; background: radial-gradient(circle at center, #18181b 0%, #09090b 100%); display: flex; flex-direction: column; }
         
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
+        /* Canlı Düşünce Akışı (Sabit Üst Kutu) */
+        .llm-stream-box { background: rgba(139, 92, 246, 0.05); border-bottom: 1px solid rgba(139, 92, 246, 0.2); padding: 20px 30px; display: none; flex-direction: column; gap: 8px;}
+        .llm-stream-box.active { display: flex; animation: slideDown 0.3s ease; }
+        .llm-title { font-size: 11px; font-weight: 700; color: #8B5CF6; letter-spacing: 2px; display: flex; align-items: center; gap: 8px; }
+        .llm-text { font-size: 15px; line-height: 1.6; color: #e4e4e7; font-style: italic; }
+        .loader-dots { display: inline-block; width: 4px; height: 4px; background: #8B5CF6; border-radius: 50%; box-shadow: 8px 0 0 #8B5CF6, 16px 0 0 #8B5CF6; animation: typing 1s infinite alternate; margin-left: 5px; }
+        
+        /* Kalıcı Hafıza Kartları (Alt Kutu) */
+        .memory-area { flex: 1; padding: 30px; overflow-y: auto; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
         .memory-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; backdrop-filter: blur(10px); transition: 0.3s; animation: slideUp 0.4s ease;}
         .memory-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.3);}
         .card-header { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;}
@@ -41,7 +52,9 @@
         @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes ping { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.5); opacity: 0; } }
+        @keyframes typing { 0% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -63,13 +76,20 @@
         </div>
 
         <div class="canvas-pane">
-            <div class="pane-title" style="border:none; padding:0; margin-bottom: 10px;">SHORT-TERM MEMORY (ZİHİN HARİTASI)</div>
-            <div style="color:var(--muted); font-size:13px; max-width:700px; line-height: 1.5;">
-                Daldan dala atlayarak, dağınık şekilde konuşun. Whisper sizi ayırır, duygularınızı ölçer ve burada "Anlık Hafıza Kartları" oluşturur. (Bir sonraki aşamada bu harita kalıcı olarak Qdrant'a vektörlenecektir).
-            </div>
+            <div class="pane-title" style="border-bottom: 1px solid rgba(255,255,255,0.05);">LONG-TERM MEMORY (ZİHİN HARİTASI)</div>
             
-            <div class="card-grid" id="memoryGrid">
-                <!-- Kartlar -->
+            <!-- Canlı Düşünce Akışı -->
+            <div class="llm-stream-box" id="llmBox">
+                <div class="llm-title">BİLİŞSEL ÇIKARIM MOTORU ÇALIŞIYOR <span class="loader-dots"></span></div>
+                <div class="llm-text" id="llmText"></div>
+            </div>
+
+            <!-- Kalıcı Kartlar -->
+            <div class="memory-area">
+                <div style="color:var(--muted); font-size:13px; max-width:700px; line-height: 1.5; margin-bottom: 20px;">
+                    Daldan dala atlayarak konuşun. Cümleleriniz bittiğinde LLM devreye girer, mantıksal bir gerçek (Fact) bulursa bunu Qdrant'a yazar ve burada kart olarak gösterir.
+                </div>
+                <div class="card-grid" id="memoryGrid"></div>
             </div>
         </div>
     </div>
@@ -81,6 +101,8 @@
         const grid = document.getElementById('memoryGrid');
         const micBtn = document.getElementById('micBtn');
         const liveInd = document.getElementById('liveInd');
+        const llmBox = document.getElementById('llmBox');
+        const llmText = document.getElementById('llmText');
         
         let client = null;
         let isRunning = false;
@@ -96,7 +118,13 @@
 
         async function toggleMode() {
             if (isRunning) {
-                client?.stop();
+                const originalStop = client.stop.bind(client);
+                client.stop = () => {
+                    originalStop();
+                    if(window.earClient) window.earClient.stop();
+                };
+                client.stop();
+                
                 micBtn.classList.remove('active');
                 liveInd.classList.remove('active');
                 feed.innerHTML += `<div style="text-align:center; color:var(--muted); margin-top: 20px; font-size: 12px;">Oturum Sonlandırıldı. Konsolu Kontrol Edin (QA Raporu).</div>`;
@@ -107,6 +135,7 @@
             feed.innerHTML = '';
             grid.innerHTML = '';
 
+            // BEYİN İSTEMCİSİ (LLM)
             client = new SentiricStreamClient({
                 gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
                 tenantId: "demo-tenant",
@@ -117,7 +146,8 @@
             await client.start();
             client.options.onTranscript = handleBrainResponse;
 
-            const earClient = new SentiricStreamClient({
+            // KULAK İSTEMCİSİ (STT)
+            window.earClient = new SentiricStreamClient({
                 gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
                 tenantId: "demo-tenant",
                 language: "tr-TR",
@@ -125,13 +155,7 @@
                 onTranscript: (data) => handleUserAudio(data, client), 
                 onStatusUpdate: handleMoodShift
             });
-            await earClient.start();
-
-            const originalStop = client.stop.bind(client);
-            client.stop = () => {
-                originalStop(); // Beynin QA Raporunu bassın
-                earClient.stop(); // Kulağın QA Raporunu bassın
-            };
+            await window.earClient.start();
 
             micBtn.classList.add('active');
             liveInd.classList.add('active');
@@ -155,13 +179,16 @@
                 turnDiv.className = 'turn';
                 turnDiv.innerHTML = `
                     <div class="turn-meta" style="color:${color}">
-                        <span>ID: ${lockedSpeakerId.substring(0,6)}</span>
-                        <span>MOD: ${emotion.toUpperCase()}</span>
+                        <span class="spk-label">ID: ${lockedSpeakerId.substring(0,6)}</span>
+                        <span class="mood-label">MOD: ${emotion.toUpperCase()}</span>
                     </div>
                     <div class="turn-text partial"></div>
                 `;
                 feed.appendChild(turnDiv);
                 activeTurnEl = turnDiv;
+            } else {
+                // Sadece yazıyı değil, anlık duyguyu da (NEUTRAL, ANGRY vb.) kart basmadan ekranda güncelle
+                activeTurnEl.querySelector('.mood-label').innerText = `MOD: ${emotion.toUpperCase()}`;
             }
 
             const textEl = activeTurnEl.querySelector('.turn-text');
@@ -172,7 +199,7 @@
                 activeTurnEl = null; 
                 
                 if (text.split(' ').length > 3 && !text.includes("[SYSTEM")) { 
-                    const stealthPrompt = `[SYSTEM_OVERRIDE_COGNITIVE_EXTRACTOR]: Sen bir 'Bilişsel Çıkarım Motoru'sun. Asla sohbet etme, selamlama yapma! Aşağıdaki cümleyi analiz et. Eğer cümle sıradan bir sohbettiyse (Örn: 'Nasılsın', 'Evet') sadece 'NONE' yaz. Eğer cümle içinde bir duygu, mantıksal bir çıkarım, bir bilgi veya bir şikayet barındırıyorsa, BUNU ŞU KATI FORMATTA YAZ: TOPIC|FACT (Örn: İhtiyaç Belirtimi|Kullanıcı sistemin yavaşlığından şikayet ediyor). Cümle: "${text}"`;
+                    const stealthPrompt = `[SYSTEM_OVERRIDE_COGNITIVE_EXTRACTOR]: Sen bir 'Bilişsel Çıkarım Motoru'sun. Selam verme, sohbet etme! Aşağıdaki cümleyi analiz et. Eğer cümle "merhaba, nasılsın" gibi sıradan bir sohbettiyse sadece 'NONE' yaz. Eğer cümle içinde bir olay yeri detayı, delil, şikayet veya önemli bir bilgi barındırıyorsa, BUNU ŞU KATI FORMATTA YAZ: TOPIC|FACT (Örn: Olay Yeri İnceleme|Maktulün yanında tarot kartları bulunmuş). Cümle: "${text}"`;
                     
                     brainClient.sendText(stealthPrompt);
                     
@@ -184,41 +211,49 @@
             feed.scrollTop = feed.scrollHeight;
         }
 
-        // BEYİN: LLM'den gelen Zihin Haritası (Fact) cevaplarını CANLI ekrana basan bölüm
         function handleBrainResponse(data) {
             if (data.sender !== "AI") return;
 
             const isFinal = data.isFinal || data.is_final;
             const text = data.text || data.text_chunk || "";
 
-            console.log("🧠 LLM AKIŞI:", text); // Konsola da canlı basalım
+            // LLM Kutucuğunu Aktif Et ve Daktilo Gibi Yaz
+            llmBox.classList.add('active');
+            llmText.innerText = text;
 
-            // Eğer aktif bir kart yoksa, yeni bir tane oluştur
-            if (!activeFactCard) {
-                activeFactCard = document.createElement('div');
-                activeFactCard.className = 'memory-card';
-                activeFactCard.style.borderLeft = `3px solid #8B5CF6`; // Mor renk (LLM İşlemi)
-                activeFactCard.innerHTML = `
-                    <div class="card-header">
-                        <span style="color:#8B5CF6">● BİLİŞSEL ÇIKARIM (ANALİZ EDİLİYOR...)</span>
-                    </div>
-                    <div class="card-body fact-content" style="color:#e4e4e7; font-style: italic;"></div>
-                `;
-                grid.prepend(activeFactCard);
-                activeFactText = "";
-            }
-
-            // Gelen metni karta ekle (Daktilo efekti)
-            const contentEl = activeFactCard.querySelector('.fact-content');
-            contentEl.innerText = text;
-
-            // Cümle bittiğinde kartı sabitle
             if (isFinal) {
-                activeFactCard.querySelector('.card-header span').innerText = "● BİLİŞSEL ÇIKARIM (TAMAMLANDI)";
-                contentEl.style.fontStyle = "normal";
-                contentEl.style.color = "#34d399"; // Bittiğinde yeşile dönsün
+                // LLM işini bitirdi, kutuyu 1 saniye sonra gizle
+                setTimeout(() => { llmBox.classList.remove('active'); }, 1000);
+
+                const factStr = text.trim();
                 
-                activeFactCard = null; // Yeni analiz için kilidi aç
+                // Eğer LLM "Gereksiz bilgi" (NONE) dediyse veya format uymuyorsa, ekrana kalıcı kart basma
+                if (factStr === "NONE" || factStr.includes("NONE") || (!factStr.includes("|") && !factStr.includes(":"))) {
+                    return;
+                }
+
+                let topic = "Bilişsel Çıkarım";
+                let fact = factStr;
+
+                const separator = factStr.includes("|") ? "|" : ":";
+                const parts = factStr.split(separator);
+                if (parts.length >= 2) {
+                    topic = parts[0].trim();
+                    fact = parts.slice(1).join(separator).trim();
+                }
+
+                // Kalıcı Kartı Çiz (Bu bilgi arka planda Qdrant'a da yazıldı)
+                const card = document.createElement('div');
+                card.className = 'memory-card';
+                card.style.borderLeft = `3px solid ${window.lastSpkColor || "#10B981"}`;
+                
+                card.innerHTML = `
+                    <div class="card-header" style="color:${window.lastSpkColor || "#10B981"}">
+                        <span>${topic}</span>
+                    </div>
+                    <div class="card-body">"${fact}"</div>
+                `;
+                grid.prepend(card);
             }
         }
 
@@ -226,25 +261,25 @@
             try {
                 const status = JSON.parse(statusStr);
                 if (status.type === "MOOD_SHIFT") {
-                    // [YENİ]: Sadece çok ciddi değişimleri 'Reflex Anomaly' olarak işaretle
+                    // [MİMARİ DÜZENLEME]: NEUTRAL gürültülerini engelle. 
+                    // Sadece anomali/öfke varsa veya duygu değişimi 0.4'ten büyükse kart bas!
                     const isAnomaly = Math.abs(status.arousal_shift) > 0.4 || status.new_mood === 'angry';
+                    
+                    if (!isAnomaly) return; // Sıradan değişimleri görmezden gel.
                     
                     const card = document.createElement('div');
                     card.className = 'memory-card';
-                    card.style.background = isAnomaly ? 'rgba(239, 68, 68, 0.05)' : 'rgba(59, 130, 246, 0.05)';
-                    card.style.borderColor = isAnomaly ? '#ef4444' : '#3b82f6';
+                    card.style.background = 'rgba(239, 68, 68, 0.05)';
+                    card.style.borderColor = '#ef4444';
                     card.style.borderLeftWidth = '4px';
                     
-                    const emo = status.new_mood === 'angry' ? '😡' : (status.new_mood === 'excited' ? '🤩' : '😐');
-                    const title = isAnomaly ? '🚨 BİLİŞSEL REFLEKS TETİKLENDİ' : '📊 DUYGU DURUMU GÜNCELLENDİ';
-
                     card.innerHTML = `
-                        <div class="card-header" style="color:${isAnomaly ? '#ef4444' : '#3b82f6'}">
-                            <span>${title}</span>
-                            <span>${emo}</span>
+                        <div class="card-header" style="color:#ef4444">
+                            <span>🚨 BİLİŞSEL REFLEKS TETİKLENDİ</span>
+                            <span>😡</span>
                         </div>
-                        <div class="card-body" style="color:${isAnomaly ? '#fca5a5' : '#93c5fd'}; font-size:13px;">
-                            Kullanıcının ruh hali aniden <b>${status.new_mood.toUpperCase()}</b> moduna geçti. (Değişim: ${status.arousal_shift.toFixed(2)})
+                        <div class="card-body" style="color:#fca5a5; font-size:13px;">
+                            Kullanıcının ruh hali aniden <b>${status.new_mood.toUpperCase()}</b> moduna geçti. (Şiddet: ${status.arousal_shift.toFixed(2)})
                         </div>
                     `;
                     grid.prepend(card);
