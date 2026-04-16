@@ -113,12 +113,34 @@
                 gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
                 tenantId: "demo-tenant",
                 language: "tr-TR",
-                listenOnlyMode: true, // Sadece dinle, AI cevap vermesin
-                onTranscript: handleTranscript,
-                onStatusUpdate: handleMoodShift
+                
+                // [MİMARİ DEVRİM]: Artık "Listen Only" (Sadece Dinle) modunda DEĞİLİZ!
+                // Chat-Only modundayız. Çünkü LLM'den "Zihin Haritası" cevabı almak istiyoruz.
+                // STT ve TTS bypass ediliyor, sadece Text gidiş-geliş var.
+                // SES İŞLEME İÇİN 2. BİR İSTEMCİ AÇIYORUZ (Aşağıda)
             });
 
+            // 1. Zihin Haritası için Sessiz LLM Bağlantısı (Arka kapı)
             await client.start();
+            client.options.onTranscript = handleBrainResponse;
+
+            // 2. Senin Sesini Dinleyen Ana Kulak Bağlantısı (Sadece Dinle)
+            const earClient = new SentiricStreamClient({
+                gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
+                tenantId: "demo-tenant",
+                language: "tr-TR",
+                listenOnlyMode: true, // Kulak sadece dinler
+                onTranscript: (data) => handleUserAudio(data, client), // Duyduğunu beyne yollar
+                onStatusUpdate: handleMoodShift
+            });
+            await earClient.start();
+
+            // Kapatırken ikisini de kapatsın diye Client'ı hackliyoruz
+            client.stop = () => {
+                client.ws?.close();
+                earClient.stop();
+            };
+
             micBtn.classList.add('active');
             liveInd.classList.add('active');
             isRunning = true;
@@ -127,7 +149,8 @@
         let lockedSpeakerId = null;
         let activeTurnEl = null;
 
-        function handleTranscript(data) {
+        // KULAK: Senin sesini dinleyip metne çeviren bölüm
+        function handleUserAudio(data, brainClient) {
             const isFinal = data.isFinal || data.is_final;
             const text = data.text || data.text_chunk || "";
             const rawSpkId = data.speakerId || data.speaker_id || "?";
@@ -137,7 +160,7 @@
             if (!lockedSpeakerId) lockedSpeakerId = rawSpkId;
             const color = getSpkColor(lockedSpeakerId);
 
-            // Sol Taraf: Transkript
+            // Sol Taraf: Transkript (Değişmedi, harika çalışıyor)
             if (!activeTurnEl) {
                 const turnDiv = document.createElement('div');
                 turnDiv.className = 'turn';
@@ -157,29 +180,62 @@
 
             if (isFinal) {
                 textEl.classList.remove('partial');
-                activeTurnEl = null; // Yeni turn için sıfırla
+                activeTurnEl = null; 
                 
-                // Sağ Taraf: Hafıza Kartı (Kelime sayısı filtrelemesi)
-                if (text.split(' ').length > 2) { 
-                    createMemoryCard(lockedSpeakerId, emotion, text, color);
+                // [SİHİR BURADA BAŞLIYOR]: Eğer cümle çok kısaysa LLM'i yorma (Tasarruf)
+                if (text.split(' ').length > 3) { 
+                    
+                    // LLM'e (BrainClient) gizli bir prompt atıyoruz.
+                    // "Bana cevap verme, sadece bu cümleyi Zihin Haritası formatında JSON olarak dön!"
+                    const stealthPrompt = `[SYSTEM_OVERRIDE]: Şu andan itibaren sen bir konuşma asistanı değilsin. Sen bir 'Bilişsel Çıkarım Motoru'sun. Aşağıdaki cümleyi analiz et. Eğer cümle sıradan bir sohbettiyse (Örn: 'Nasılsın', 'Evet') sadece 'NONE' yaz. Eğer cümle içinde bir duygu, mantıksal bir çıkarım, bir bilgi veya bir şikayet barındırıyorsa, bunu şu formatta yaz: TOPIC|FACT (Örn: Çelişki Sorgulaması|Kullanıcı amcası olmayan bir çocuğu sorguluyor). Cümle: "${text}"`;
+                    
+                    brainClient.sendText(stealthPrompt);
+                    
+                    // Not: Bu cümlenin kime ait olduğunu (Rengi vb) hafızada tutmalıyız ki, 
+                    // LLM cevabı döndüğünde kartı doğru renge boyayalım. 
+                    // (Şimdilik global değişkene atalım, basit kalsın)
+                    window.lastSpkColor = color;
+                    window.lastEmotion = emotion;
                 }
                 lockedSpeakerId = null; // Kilit açıldı
             }
             feed.scrollTop = feed.scrollHeight;
         }
 
-        function createMemoryCard(spkId, emotion, text, color) {
+        // BEYİN: LLM'den gelen Zihin Haritası (Fact) cevaplarını ekrana basan bölüm
+        function handleBrainResponse(data) {
+            // Sadece AI'ın cevaplarını (Zihin Haritası dökümünü) al
+            if (data.sender !== "AI") return;
+
+            const isFinal = data.isFinal || data.is_final;
+            const text = data.text || data.text_chunk || "";
+
+            if (isFinal) {
+                const factStr = text.trim();
+                
+                // LLM "Bu cümleden bir şey çıkmaz" (NONE) dediyse kart yaratma!
+                if (factStr === "NONE" || factStr.includes("NONE")) return;
+
+                // Beklenen format: "TOPIC|FACT"
+                let topic = "Bilişsel Çıkarım";
+                let fact = factStr;
+
+                if (factStr.includes("|")) {
+                    const parts = factStr.split("|");
+                    topic = parts[0].trim();
+                    fact = parts[1].trim();
+                }
+
+                createMemoryCard(topic, fact, window.lastEmotion || "neutral", window.lastSpkColor || "#3B82F6");
+            }
+        }
+
+        // Sağ Taraf: Hafıza Kartı Üretici (Artık Hardcode Değil, Saf Zeka!)
+        function createMemoryCard(topic, fact, emotion, color) {
             const card = document.createElement('div');
             card.className = 'memory-card';
             card.style.borderLeft = `3px solid ${color}`;
             
-            // Konu Çıkarımı Heuristiği (Sadece Görsel)
-            let topic = "Genel Beyan";
-            const tLow = text.toLowerCase();
-            if (tLow.includes("sorun") || tLow.includes("hata") || tLow.includes("çelişki")) topic = "Sorgulama / Çelişki";
-            if (tLow.includes("istiyorum") || tLow.includes("lazım")) topic = "İhtiyaç Belirtimi";
-            if (tLow.includes("bilmece") || tLow.includes("soracağım")) topic = "Mental Egzersiz";
-
             const emoColor = emotion === 'angry' ? '#ef4444' : emotion === 'excited' ? '#f59e0b' : color;
 
             card.innerHTML = `
@@ -187,7 +243,7 @@
                     <span style="color:${color}">● ${topic}</span>
                     <span style="color:${emoColor}">${emotion}</span>
                 </div>
-                <div class="card-body">"${text}"</div>
+                <div class="card-body">"${fact}"</div>
             `;
             grid.prepend(card);
         }
