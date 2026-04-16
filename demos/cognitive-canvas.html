@@ -184,34 +184,41 @@
             feed.scrollTop = feed.scrollHeight;
         }
 
+        // BEYİN: LLM'den gelen Zihin Haritası (Fact) cevaplarını CANLI ekrana basan bölüm
         function handleBrainResponse(data) {
             if (data.sender !== "AI") return;
 
             const isFinal = data.isFinal || data.is_final;
             const text = data.text || data.text_chunk || "";
 
+            console.log("🧠 LLM AKIŞI:", text); // Konsola da canlı basalım
+
+            // Eğer aktif bir kart yoksa, yeni bir tane oluştur
+            if (!activeFactCard) {
+                activeFactCard = document.createElement('div');
+                activeFactCard.className = 'memory-card';
+                activeFactCard.style.borderLeft = `3px solid #8B5CF6`; // Mor renk (LLM İşlemi)
+                activeFactCard.innerHTML = `
+                    <div class="card-header">
+                        <span style="color:#8B5CF6">● BİLİŞSEL ÇIKARIM (ANALİZ EDİLİYOR...)</span>
+                    </div>
+                    <div class="card-body fact-content" style="color:#e4e4e7; font-style: italic;"></div>
+                `;
+                grid.prepend(activeFactCard);
+                activeFactText = "";
+            }
+
+            // Gelen metni karta ekle (Daktilo efekti)
+            const contentEl = activeFactCard.querySelector('.fact-content');
+            contentEl.innerText = text;
+
+            // Cümle bittiğinde kartı sabitle
             if (isFinal) {
-                // [YENİ] LLM'in ne düşündüğünü konsolda görelim!
-                console.log("🧠 BEYİN (LLM) ANALİZİ:", text); 
+                activeFactCard.querySelector('.card-header span').innerText = "● BİLİŞSEL ÇIKARIM (TAMAMLANDI)";
+                contentEl.style.fontStyle = "normal";
+                contentEl.style.color = "#34d399"; // Bittiğinde yeşile dönsün
                 
-                const factStr = text.trim();
-                if (factStr === "NONE" || factStr.includes("NONE")) return;
-
-                let topic = "Bilişsel Çıkarım";
-                let fact = factStr;
-
-                // LLM '|' veya ':' kullanmış olabilir, ikisini de yakala!
-                if (factStr.includes("|")) {
-                    const parts = factStr.split("|");
-                    topic = parts[0].trim();
-                    fact = parts.slice(1).join("|").trim();
-                } else if (factStr.includes(":")) {
-                    const parts = factStr.split(":");
-                    topic = parts[0].trim();
-                    fact = parts.slice(1).join(":").trim();
-                }
-
-                createMemoryCard(topic, fact, window.lastEmotion || "neutral", window.lastSpkColor || "#3B82F6");
+                activeFactCard = null; // Yeni analiz için kilidi aç
             }
         }
 
