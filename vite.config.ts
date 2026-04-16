@@ -22,7 +22,7 @@ export default defineConfig({
         analyst: resolve(__dirname, 'demos/meeting-analyst.html'),
         megaphone: resolve(__dirname, 'demos/megaphone.html'),
         omnichat: resolve(__dirname, 'demos/omni-chat.html'),
-        // Kütüphane çıktısını da buraya ekliyoruz
+        cognitive: resolve(__dirname, 'demos/cognitive-canvas.html'), // [YENİ]
         sdk: resolve(__dirname, 'src/index.ts')
       },
       output: {
