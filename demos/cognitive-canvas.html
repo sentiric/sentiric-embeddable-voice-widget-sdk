@@ -1,74 +1,353 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cognitive Canvas | Sentiric OS</title>
     <style>
-        :root { --bg: #09090b; --panel: #18181b; --accent: #3b82f6; --text: #f4f4f5; --muted: #a1a1aa; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        
-        .header { padding: 15px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; background: var(--panel); z-index: 10;}
-        .header-title { font-weight: 700; font-size: 16px; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
-        .header-title span { color: var(--accent); }
-        .live-indicator { width: 10px; height: 10px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981; animation: pulse 2s infinite; display: none; }
-        .live-indicator.active { display: block; }
-        
-        .workspace { display: flex; flex: 1; overflow: hidden; }
-        
+        :root {
+            --bg: #09090b;
+            --panel: #18181b;
+            --accent: #3b82f6;
+            --text: #f4f4f5;
+            --muted: #a1a1aa;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 15px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--panel);
+            z-index: 10;
+        }
+
+        .header-title {
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-title span {
+            color: var(--accent);
+        }
+
+        .live-indicator {
+            width: 10px;
+            height: 10px;
+            background: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #10b981;
+            animation: pulse 2s infinite;
+            display: none;
+        }
+
+        .live-indicator.active {
+            display: block;
+        }
+
+        .workspace {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
         /* SOL EKRAN (Kulak) */
-        .transcript-pane { width: 35%; border-right: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; background: var(--bg); }
-        .pane-title { padding: 12px 20px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.05); background: var(--panel); }
-        .feed { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth;}
-        
-        .turn { display: flex; flex-direction: column; gap: 6px; animation: fadeIn 0.3s ease; }
-        .turn-meta { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; letter-spacing: 1px;}
-        .turn-text { font-size: 15px; line-height: 1.6; color: #d4d4d8; }
-        .turn-text.partial { opacity: 0.5; font-style: italic; }
-        
+        .transcript-pane {
+            width: 35%;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+        }
+
+        .pane-title {
+            padding: 12px 20px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+            letter-spacing: 2px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            background: var(--panel);
+        }
+
+        .feed {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scroll-behavior: smooth;
+        }
+
+        .turn {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .turn-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .turn-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: #d4d4d8;
+        }
+
+        .turn-text.partial {
+            opacity: 0.5;
+            font-style: italic;
+        }
+
         /* SAĞ EKRAN (Beyin) */
-        .canvas-pane { width: 65%; background: radial-gradient(circle at center, #18181b 0%, #09090b 100%); display: flex; flex-direction: column; }
-        
+        .canvas-pane {
+            width: 65%;
+            background: radial-gradient(circle at center, #18181b 0%, #09090b 100%);
+            display: flex;
+            flex-direction: column;
+        }
+
         /* Canlı Düşünce Akışı (Sabit Üst Kutu) */
-        .llm-stream-box { background: rgba(139, 92, 246, 0.05); border-bottom: 1px solid rgba(139, 92, 246, 0.2); padding: 20px 30px; display: none; flex-direction: column; gap: 8px;}
-        .llm-stream-box.active { display: flex; animation: slideDown 0.3s ease; }
-        .llm-title { font-size: 11px; font-weight: 700; color: #8B5CF6; letter-spacing: 2px; display: flex; align-items: center; gap: 8px; }
-        .llm-text { font-size: 15px; line-height: 1.6; color: #e4e4e7; font-style: italic; }
-        .loader-dots { display: inline-block; width: 4px; height: 4px; background: #8B5CF6; border-radius: 50%; box-shadow: 8px 0 0 #8B5CF6, 16px 0 0 #8B5CF6; animation: typing 1s infinite alternate; margin-left: 5px; }
-        
+        .llm-stream-box {
+            background: rgba(139, 92, 246, 0.05);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+            padding: 20px 30px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .llm-stream-box.active {
+            display: flex;
+            animation: slideDown 0.3s ease;
+        }
+
+        .llm-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #8B5CF6;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .llm-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: #e4e4e7;
+            font-style: italic;
+        }
+
+        .loader-dots {
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            background: #8B5CF6;
+            border-radius: 50%;
+            box-shadow: 8px 0 0 #8B5CF6, 16px 0 0 #8B5CF6;
+            animation: typing 1s infinite alternate;
+            margin-left: 5px;
+        }
+
         /* Kalıcı Hafıza Kartları (Alt Kutu) */
-        .memory-area { flex: 1; padding: 30px; overflow-y: auto; }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        .memory-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; backdrop-filter: blur(10px); transition: 0.3s; animation: slideUp 0.4s ease;}
-        .memory-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.3);}
-        .card-header { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;}
-        .card-body { font-size: 14px; line-height: 1.6; color: #e4e4e7;}
-        
-        .control-bar { padding: 20px; background: var(--panel); border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: center; }
-        .mic-btn { width: 64px; height: 64px; border-radius: 50%; background: var(--text); color: var(--bg); border: none; font-size: 24px; cursor: pointer; transition: 0.3s; display: grid; place-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3);}
-        .mic-btn.active { background: #ef4444; color: white; box-shadow: 0 0 25px rgba(239, 68, 68, 0.5); }
-        .mic-btn.active::after { content: ""; position: absolute; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #ef4444; animation: ping 1.5s infinite; }
-        
-        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes ping { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.5); opacity: 0; } }
-        @keyframes typing { 0% { opacity: 0.3; } 100% { opacity: 1; } }
+        .memory-area {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .memory-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            transition: 0.3s;
+            animation: slideUp 0.4s ease;
+        }
+
+        .memory-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card-body {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #e4e4e7;
+        }
+
+        .control-bar {
+            padding: 20px;
+            background: var(--panel);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: center;
+        }
+
+        .mic-btn {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--text);
+            color: var(--bg);
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            transition: 0.3s;
+            display: grid;
+            place-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .mic-btn.active {
+            background: #ef4444;
+            color: white;
+            box-shadow: 0 0 25px rgba(239, 68, 68, 0.5);
+        }
+
+        .mic-btn.active::after {
+            content: "";
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 2px solid #ef4444;
+            animation: ping 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(1.2);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes ping {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        @keyframes typing {
+            0% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
     </style>
 </head>
+
 <body>
 
     <div class="header">
-        <div class="header-title">🧠 <span>COGNITIVE</span> CANVAS <div class="live-indicator" id="liveInd"></div></div>
-        <a href="../index.html" style="color:var(--muted); text-decoration:none; font-size: 12px; font-weight:600;">&larr; Vitrine Dön</a>
+        <div class="header-title">🧠 <span>COGNITIVE</span> CANVAS <div class="live-indicator" id="liveInd"></div>
+        </div>
+        <a href="../index.html"
+            style="color:var(--muted); text-decoration:none; font-size: 12px; font-weight:600;">&larr; Vitrine Dön</a>
     </div>
 
     <div class="workspace">
         <div class="transcript-pane">
             <div class="pane-title">SENSORY INPUT (İŞİTSEL KORTEKS)</div>
             <div class="feed" id="feed">
-                <div style="text-align:center; color:var(--muted); margin-top: 40px; font-size: 13px;">Bağlantı bekleniyor...</div>
+                <div style="text-align:center; color:var(--muted); margin-top: 40px; font-size: 13px;">Bağlantı
+                    bekleniyor...</div>
             </div>
             <div class="control-bar">
                 <button class="mic-btn" id="micBtn" title="Zihne Bağlan">🎤</button>
@@ -76,8 +355,9 @@
         </div>
 
         <div class="canvas-pane">
-            <div class="pane-title" style="border-bottom: 1px solid rgba(255,255,255,0.05);">LONG-TERM MEMORY (ZİHİN HARİTASI)</div>
-            
+            <div class="pane-title" style="border-bottom: 1px solid rgba(255,255,255,0.05);">LONG-TERM MEMORY (ZİHİN
+                HARİTASI)</div>
+
             <!-- Canlı Düşünce Akışı -->
             <div class="llm-stream-box" id="llmBox">
                 <div class="llm-title">BİLİŞSEL ÇIKARIM MOTORU ÇALIŞIYOR <span class="loader-dots"></span></div>
@@ -86,8 +366,10 @@
 
             <!-- Kalıcı Kartlar -->
             <div class="memory-area">
-                <div style="color:var(--muted); font-size:13px; max-width:700px; line-height: 1.5; margin-bottom: 20px;">
-                    Daldan dala atlayarak konuşun. Cümleleriniz bittiğinde LLM devreye girer, mantıksal bir gerçek (Fact) bulursa bunu Qdrant'a yazar ve burada kart olarak gösterir.
+                <div
+                    style="color:var(--muted); font-size:13px; max-width:700px; line-height: 1.5; margin-bottom: 20px;">
+                    Daldan dala atlayarak konuşun. Cümleleriniz bittiğinde LLM devreye girer, mantıksal bir gerçek
+                    (Fact) bulursa bunu Qdrant'a yazar ve burada kart olarak gösterir.
                 </div>
                 <div class="card-grid" id="memoryGrid"></div>
             </div>
@@ -96,14 +378,14 @@
 
     <script type="module">
         import { SentiricStreamClient } from '/src/index.ts';
-        
+
         const feed = document.getElementById('feed');
         const grid = document.getElementById('memoryGrid');
         const micBtn = document.getElementById('micBtn');
         const liveInd = document.getElementById('liveInd');
         const llmBox = document.getElementById('llmBox');
         const llmText = document.getElementById('llmText');
-        
+
         let client = null;
         let isRunning = false;
 
@@ -121,10 +403,10 @@
                 const originalStop = client.stop.bind(client);
                 client.stop = () => {
                     originalStop();
-                    if(window.earClient) window.earClient.stop();
+                    if (window.earClient) window.earClient.stop();
                 };
                 client.stop();
-                
+
                 micBtn.classList.remove('active');
                 liveInd.classList.remove('active');
                 feed.innerHTML += `<div style="text-align:center; color:var(--muted); margin-top: 20px; font-size: 12px;">Oturum Sonlandırıldı. Konsolu Kontrol Edin (QA Raporu).</div>`;
@@ -140,7 +422,7 @@
                 gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
                 tenantId: "demo-tenant",
                 language: "tr-TR",
-                chatOnlyMode: true 
+                chatOnlyMode: true
             });
 
             await client.start();
@@ -152,7 +434,7 @@
                 tenantId: "demo-tenant",
                 language: "tr-TR",
                 listenOnlyMode: true,
-                onTranscript: (data) => handleUserAudio(data, client), 
+                onTranscript: (data) => handleUserAudio(data, client),
                 onStatusUpdate: handleMoodShift
             });
             await window.earClient.start();
@@ -179,7 +461,7 @@
                 turnDiv.className = 'turn';
                 turnDiv.innerHTML = `
                     <div class="turn-meta" style="color:${color}">
-                        <span class="spk-label">ID: ${lockedSpeakerId.substring(0,6)}</span>
+                        <span class="spk-label">ID: ${lockedSpeakerId.substring(0, 6)}</span>
                         <span class="mood-label">MOD: ${emotion.toUpperCase()}</span>
                     </div>
                     <div class="turn-text partial"></div>
@@ -196,13 +478,27 @@
 
             if (isFinal) {
                 textEl.classList.remove('partial');
-                activeTurnEl = null; 
-                
-                if (text.split(' ').length > 3 && !text.includes("[SYSTEM")) { 
-                    const stealthPrompt = `[SYSTEM_OVERRIDE_COGNITIVE_EXTRACTOR]: Sen bir bilgi çıkarım motorusun. Asla sohbet etme. Aşağıdaki metni analiz et. Sadece kayda değer bir olay, itiraf, şikayet veya önemli bir olgu varsa bunu kategorize ederek yaz. FORMAT: Kategori Adı | Çıkarılan Gerçek. Örnek: Olay Yeri Detayı | Maktulün yanında tarot kartları bulunmuş. Eğer sıradan bir sohbetse sadece NONE yaz. Başka kelime kullanma. METİN: "${text}"`;
-                    
+                activeTurnEl = null;
+
+                if (text.split(' ').length > 3 && !text.includes("[SYSTEM")) {
+                    const stealthPrompt = `[SYSTEM_OVERRIDE_COGNITIVE_EXTRACTOR]: Sen bir 'Evrensel Bilişsel Gözlemci' (Universal Cognitive Observer) motorusun. 
+Görevin, daldan dala atlayan insan konuşmalarını dinleyip içindeki 'Kritik Bilgi Özlerini' çıkarmaktır.
+
+Konu kısıtlaman yok! Analiz ettiğin cümleye göre kategoriyi (Topic) KENDİN BELİRLE.
+Örnek Çeşitliliği:
+- 'Teknik Fikir | Kullanıcı paslanmaz çelik yerine karbon fiber kullanmayı öneriyor.'
+- 'Kişisel Hafıza | Kullanıcının amcası olmadığını ve çocukluk anılarını tartışıyor.'
+- 'İş Planı | Yarın sabah saat 10:00'da ekip toplantısı yapılacakmış.'
+- 'Felsefi Sorgulama | Herkesin hata yapabileceği gerçeği üzerine mantık yürütüyor.'
+- 'Duygusal İtiraf | Kullanıcı son zamanlarda projenin hızından dolayı stresli hissediyor.'
+- 'Bilimsel Not | Kuantum dolanıklığı ile veri iletimi üzerine sesli düşünüyor.'
+
+Sadece şu formatta yaz: Kategori | Çıkarılan Gerçek Özeti.
+Eğer cümle sadece "nasılsın, tamam, evet" gibi derinliği olmayan bir sohbettiyse sadece NONE yaz.
+METİN: "${text}"`;
+
                     brainClient.sendText(stealthPrompt);
-                    
+
                     window.lastSpkColor = color;
                     window.lastEmotion = emotion;
                 }
@@ -227,9 +523,9 @@
             // Eğer 1.5 saniye boyunca yeni harf gelmezse, LLM cümlenin sonuna gelmiştir!
             aiTypingTimeout = setTimeout(() => {
                 llmBox.classList.remove('active'); // Kutuyu gizle
-                
+
                 const factStr = text.trim();
-                
+
                 // Eğer LLM "NONE" dediyse veya format uymuyorsa kart basma
                 if (factStr === "NONE" || factStr.includes("NONE") || (!factStr.includes("|") && !factStr.includes(":"))) {
                     return;
@@ -238,11 +534,11 @@
                 // Format parçalayıcı ( | veya : )
                 const separator = factStr.includes("|") ? "|" : ":";
                 const parts = factStr.split(separator);
-                
+
                 // Prompt'tan sızabilecek "TOPIC" veya "FACT" kelimelerini UI'da da temizle
                 let topic = parts[0].replace(/TOPIC|Kategori/gi, "").replace(/:/g, "").trim();
                 let fact = parts.slice(1).join(separator).replace(/FACT|Gerçek/gi, "").replace(/:/g, "").trim();
-                
+
                 if (!topic) topic = "Bilişsel Çıkarım";
 
                 // Kalıcı Kartı Çiz
@@ -267,15 +563,15 @@
                     // [MİMARİ DÜZENLEME]: NEUTRAL gürültülerini engelle. 
                     // Sadece anomali/öfke varsa veya duygu değişimi 0.4'ten büyükse kart bas!
                     const isAnomaly = Math.abs(status.arousal_shift) > 0.4 || status.new_mood === 'angry';
-                    
+
                     if (!isAnomaly) return; // Sıradan değişimleri görmezden gel.
-                    
+
                     const card = document.createElement('div');
                     card.className = 'memory-card';
                     card.style.background = 'rgba(239, 68, 68, 0.05)';
                     card.style.borderColor = '#ef4444';
                     card.style.borderLeftWidth = '4px';
-                    
+
                     card.innerHTML = `
                         <div class="card-header" style="color:#ef4444">
                             <span>🚨 BİLİŞSEL REFLEKS TETİKLENDİ</span>
@@ -287,10 +583,11 @@
                     `;
                     grid.prepend(card);
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
 
         micBtn.onclick = toggleMode;
     </script>
 </body>
+
 </html>
