@@ -226,13 +226,13 @@ export class SentiricStreamClient {
       this.options.sampleRate,
     );
     await this.connect();
-    if (
-      !this.options.chatOnlyMode &&
-      !this.options.speakOnlyMode &&
-      !this.options.listenOnlyMode
-    ) {
+
+    // [ARCH-COMPLIANCE FIX]: listenOnlyMode mikrofonu AÇMAK ZORUNDADIR!
+    // Sadece chatOnlyMode veya speakOnlyMode açıksa mikrofon kapalı kalır.
+    if (!this.options.chatOnlyMode && !this.options.speakOnlyMode) {
       await this.audioManager.startMicrophone();
     }
+
     Logger.info("SESSION_ACTIVE", "AI Session started successfully.");
   }
 }

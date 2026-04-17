@@ -468,7 +468,8 @@
             window.earClient = new SentiricStreamClient({
                 gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
                 tenantId: "demo-tenant",
-                userId: "demo-ceo-123", // [YENİ]
+                // [FIX]: userId KALDIRILDI! Sözleşmede olmadığı için hata veriyordu.
+                // Sadece traceId ve sessionId vererek bağlamı korur.
                 language: "tr-TR",
                 listenOnlyMode: true,
                 onTranscript: (data) => handleUserAudio(data, client),
