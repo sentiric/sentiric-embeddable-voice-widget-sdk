@@ -178,14 +178,14 @@ export class SentiricStreamClient {
 
         try {
           if (this.options.onTranscript) this.options.onTranscript(t);
-        } catch (e) {}
+        } catch {} // (e) silindi
       } else if (message.clearAudioBuffer) {
         this.audioManager?.flushPlayback();
       } else if (message.statusUpdate) {
         try {
           if (this.options.onStatusUpdate)
             this.options.onStatusUpdate(message.statusUpdate);
-        } catch (e) {}
+        } catch {} // (e) silindi
       }
     } catch (e) {
       Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });

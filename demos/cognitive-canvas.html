@@ -446,6 +446,10 @@
 
         let lockedSpeakerId = null;
         let activeTurnEl = null;
+        
+        // [YENİ]: Cümle biriktirici (Debouncer)
+        let sentenceBuffer = "";
+        let brainTriggerTimeout = null;
 
         function handleUserAudio(data, brainClient) {
             const isFinal = data.isFinal || data.is_final;
@@ -469,7 +473,6 @@
                 feed.appendChild(turnDiv);
                 activeTurnEl = turnDiv;
             } else {
-                // Sadece yazıyı değil, anlık duyguyu da (NEUTRAL, ANGRY vb.) kart basmadan ekranda güncelle
                 activeTurnEl.querySelector('.mood-label').innerText = `MOD: ${emotion.toUpperCase()}`;
             }
 
@@ -479,10 +482,21 @@
             if (isFinal) {
                 textEl.classList.remove('partial');
                 activeTurnEl = null;
-
-                if (text.split(' ').length > 3 && !text.includes("[SYSTEM")) {
-                    console.log("Final metin beyne gönderiliyor:", text);
-                    const stealthPrompt = `
+                lockedSpeakerId = null;
+                
+                // [KRİTİK FIX]: Metni Buffer'a ekle ve 1.5 sn sessizlik bekle
+                sentenceBuffer += text + " ";
+                clearTimeout(brainTriggerTimeout);
+                
+                brainTriggerTimeout = setTimeout(() => {
+                    const finalContext = sentenceBuffer.trim();
+                    sentenceBuffer = ""; // Buffer'ı sıfırla
+                    
+                    if (finalContext.split(' ').length > 2 && !finalContext.includes("[SYSTEM")) {
+                        console.log("Zihin Haritasına Gönderiliyor:", finalContext);
+                        
+                        // [KRİTİK FIX]: Crystalline'in Qdrant'a yazması için ZORUNLU şifre eklendi
+                        const stealthPrompt = `[SYSTEM_OVERRIDE_COGNITIVE_EXTRACTOR]
 # ROLE: UNIVERSAL COGNITIVE EXTRACTOR (v6.0 - Ultimate)
 Görevin: Metni analiz et ve aşağıdaki 15 KESİN ATOMİK kategoriden en uygun olanı seçerek JSON üret.
 
@@ -504,27 +518,26 @@ Görevin: Metni analiz et ve aşağıdaki 15 KESİN ATOMİK kategoriden en uygun
 - İş & Kariyer
 
 ### KURALLAR:
-1. SADECE yukarıdaki listeden bir kategori seç. Kendi kategorini üretme.
+1. SADECE yukarıdaki listeden bir kategori seç.
 2. Metin sadece nezaket cümleleri (selam, tşk) içeriyorsa SADECE "NONE" yaz.
 3. Çıktı formatı kesinlikle saf JSON olmalıdır.
-4. 'summary' kısmını 3. tekil şahıs ("Kullanıcı...") olarak, yorum katmadan yaz.
+4. 'summary' kısmını 3. tekil şahıs ("Kullanıcı...") olarak yaz.
 
 ### ÇIKTI FORMATI:
 {
   "category": "Kategori Adı",
-  "summary": "Kullanıcı perspektifinden kısa ve net gerçek.",
+  "summary": "Özet",
   "importance": 1-5,
-  "metadata": "Spesifik anahtar kelimeler, markalar, kod parçacıkları veya isimler"
+  "metadata": "Anahtar kelimeler"
 }
 
-METİN: "${text}"
-`;
-                    brainClient.sendText(stealthPrompt);
-
-                    window.lastSpkColor = color;
-                    window.lastEmotion = emotion;
-                }
-                lockedSpeakerId = null;
+METİN: "${finalContext}"`;
+                        
+                        brainClient.sendText(stealthPrompt);
+                        window.lastSpkColor = color;
+                        window.lastEmotion = emotion;
+                    }
+                }, 1500); // 1.5 saniye sessizlik kuralı
             }
             feed.scrollTop = feed.scrollHeight;
         }
@@ -534,6 +547,11 @@ METİN: "${text}"
         function handleBrainResponse(data) {
             if (data.sender !== "AI") return;
             const rawText = (data.text || data.text_chunk || "").trim();
+
+            // Sadece JSON barındıran veya NONE diyen mesajları dikkate al (Selamlamaları YUT)
+            if (!rawText.includes('{') && !rawText.includes('NONE')) {
+                return; // Gateway'den gelen "Bağlantı kuruldu" mesajını sessizce yutar
+            }
 
             llmBox.classList.add('active');
             llmText.innerText = rawText;
@@ -546,22 +564,16 @@ METİN: "${text}"
                 if (rawText === "NONE" || rawText.includes("NONE")) return;
 
                 try {
-                    // --- TEMİZLEME OPERASYONU BAŞLAR ---
-                    // 1. Markdown bloklarını (```json ve ```) temizle
                     let cleanText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-
-                    // 2. Eğer JSON başında/sonunda ekstra metin varsa sadece { ... } arasını al
                     const firstBracket = cleanText.indexOf('{');
                     const lastBracket = cleanText.lastIndexOf('}');
 
                     if (firstBracket !== -1 && lastBracket !== -1) {
                         cleanText = cleanText.substring(firstBracket, lastBracket + 1);
                     }
-                    // --- TEMİZLEME OPERASYONU BİTTİ ---
 
                     const memory = JSON.parse(cleanText);
 
-                    // Kartı Çizme Mantığı
                     const card = document.createElement('div');
                     card.className = 'memory-card';
 
@@ -575,18 +587,17 @@ METİN: "${text}"
                             <span style="opacity:0.6">ÖNEM: ${memory.importance}/5</span>
                         </div>
                         <div class="card-body">"${memory.summary}"</div>
-                        ${memory.metadata ? `<div style="font-size:10px; color:var(--muted); margin-top:8px; border-top:1px solid rgba(255,255,255,0.05); pt-4">Not: ${memory.metadata}</div>` : ''}
+                        ${memory.metadata ? `<div style="font-size:10px; color:var(--muted); margin-top:8px; border-top:1px solid rgba(255,255,255,0.05); padding-top:4px">Not: ${memory.metadata}</div>` : ''}
                     `;
                     grid.prepend(card);
 
                 } catch (e) {
-                    console.error("Hafıza hala parse edilemedi. Gelen ham veri:", rawText);
-                    console.error("Hata detayı:", e);
+                    console.warn("Sohbet mesajı JSON değil, yoksayıldı:", rawText);
                 }
 
             }, 1500);
         }
-
+        
         function handleMoodShift(statusStr) {
             try {
                 const status = JSON.parse(statusStr);
