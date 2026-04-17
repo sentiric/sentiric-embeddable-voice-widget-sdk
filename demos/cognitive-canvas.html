@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cognitive Canvas v6.1 | Sentiric OS</title>
+    <title>Cognitive Canvas v6.2 | Sentiric OS</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
 
         :root {
-            --bg: #030712; --panel: #0f172a; --panel-border: #1e293b;
+            --bg: #020617; --panel: #0f172a; --panel-border: #1e293b;
             --accent: #38bdf8; --accent-glow: rgba(56, 189, 248, 0.4);
             --text: #f8fafc; --muted: #64748b; --danger: #ef4444;
         }
@@ -18,7 +18,7 @@
             margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* 1. HEADER BÖLÜMÜ */
+        /* 1. HEADER */
         .header {
             padding: 16px 24px; background: var(--panel); border-bottom: 1px solid var(--panel-border);
             display: flex; justify-content: space-between; align-items: center; z-index: 20; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
@@ -28,16 +28,16 @@
         .pulse { width: 10px; height: 10px; background: #10b981; border-radius: 50%; box-shadow: 0 0 12px #10b981; animation: blink 2s infinite; display: none; }
         .pulse.active { display: block; }
         
-        .settings-bar { display: flex; gap: 10px; align-items: center;}
-        .settings-bar input { background: #1e293b; border: 1px solid #334155; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; width: 250px; outline: none;}
-        .settings-bar input:focus { border-color: var(--accent); }
+        .settings-bar { display: flex; gap: 12px; align-items: center; background: #1e293b; padding: 6px 12px; border-radius: 8px;}
+        .settings-bar label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;}
+        .settings-bar input { background: transparent; border: none; color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 13px; width: 300px; outline: none;}
 
         /* 2. ÇALIŞMA ALANI */
         .workspace { display: flex; flex: 1; overflow: hidden; }
 
-        /* SOL: SENSORY INPUT (İŞİTSEL KORTEKS) */
-        .sensory-pane { width: 400px; border-right: 1px solid var(--panel-border); display: flex; flex-direction: column; background: var(--bg); z-index: 10; }
-        .pane-header { padding: 14px 20px; font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 1.5px; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--panel-border); display: flex; justify-content: space-between; align-items: center;}
+        /* SOL: SENSORY INPUT */
+        .sensory-pane { width: 450px; border-right: 1px solid var(--panel-border); display: flex; flex-direction: column; background: var(--bg); z-index: 10; }
+        .pane-header { padding: 14px 20px; font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 1.5px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid var(--panel-border); display: flex; justify-content: space-between; align-items: center;}
         .feed { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; scroll-behavior: smooth;}
         
         .turn { display: flex; flex-direction: column; gap: 8px; animation: slideInLeft 0.3s ease; }
@@ -50,23 +50,23 @@
         .mic-btn:hover { transform: scale(1.05); }
         .mic-btn.active { background: var(--danger); color: white; box-shadow: 0 0 30px rgba(239, 68, 68, 0.6); animation: micPulse 2s infinite; }
 
-        /* SAĞ: COGNITIVE CORE (BEYİN) */
-        .cognitive-pane { flex: 1; background: radial-gradient(circle at top, #1e293b 0%, #030712 100%); display: flex; flex-direction: column; position: relative; }
+        /* SAĞ: COGNITIVE CORE */
+        .cognitive-pane { flex: 1; background: radial-gradient(circle at top right, #1e293b 0%, #020617 100%); display: flex; flex-direction: column; position: relative; }
         
         .extraction-loader { position: absolute; top: 0; left: 0; right: 0; background: rgba(56, 189, 248, 0.15); border-bottom: 1px solid rgba(56, 189, 248, 0.4); padding: 12px; font-size: 11px; font-weight: 800; color: var(--accent); text-align: center; letter-spacing: 2px; transform: translateY(-100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 5; box-shadow: 0 10px 30px var(--accent-glow); backdrop-filter: blur(5px);}
         .extraction-loader.active { transform: translateY(0); }
         
         .memory-grid { padding: 40px; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; overflow-y: auto; align-content: flex-start;}
         
-        .memory-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; backdrop-filter: blur(12px); animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden; transition: transform 0.3s, box-shadow 0.3s; }
+        .memory-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; backdrop-filter: blur(12px); animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden; transition: transform 0.3s, box-shadow 0.3s; }
         .memory-card:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
         .memory-card::before { content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 4px; background: var(--card-color, #38bdf8); box-shadow: 0 0 15px var(--card-color); }
         
         .memory-card.critical { background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.3); }
         
-        .card-category { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--card-color, #38bdf8); text-transform: uppercase; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;}
+        .card-category { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--card-color, #38bdf8); text-transform: uppercase; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;}
         .card-summary { font-size: 15px; line-height: 1.6; color: white; font-weight: 500; }
-        .card-tags { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .card-tags { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
         .tag { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 8px; font-size: 10px; color: #cbd5e1; font-family: 'JetBrains Mono', monospace;}
 
         /* ANIMATIONS */
@@ -84,32 +84,32 @@
 <body>
 
     <div class="header">
-        <div class="header-title">🧠 COGNITIVE <span>CANVAS</span> <div class="pulse" id="pulse"></div></div>
-        <div class="settings-bar">
-            <!-- CORS ve Çapraz Port sorunlarını çözmek için Knowledge Query URL'ini dışarı aldık -->
-            <input type="text" id="knowledgeApiUrl" placeholder="Knowledge Query API URL" value="http://localhost:17020">
-            <a href="../index.html" style="color:var(--muted); text-decoration:none; font-size: 12px; font-weight:600; margin-left:15px;">&larr; Kapat</a>
+        <div class="header-title">🧠 COGNITIVE <span>CANVAS v6.2</span> <div class="pulse" id="pulse"></div></div>
+        <div style="display: flex; gap: 20px; align-items: center;">
+            <div class="settings-bar">
+                <label>Qdrant API</label>
+                <input type="text" id="knowledgeApiUrl" title="HTTPS/WSS uyuşmazlığını aşmak için API adresi">
+            </div>
+            <a href="../index.html" style="color:var(--muted); text-decoration:none; font-size: 12px; font-weight:600;">&larr; Çıkış</a>
         </div>
     </div>
 
     <div class="workspace">
-        <!-- SOL PANEL -->
         <div class="sensory-pane">
             <div class="pane-header">
                 <span>İŞİTSEL KORTEKS</span>
-                <span style="color: #10b981" id="connStatus">Offline</span>
+                <span style="color: #10b981" id="connStatus">OFFLINE</span>
             </div>
             <div class="feed" id="feed">
-                <div style="text-align:center; color:var(--muted); margin-top:60px; font-size:13px; line-height:1.6;">
-                    Bu ekran sizinle AI arasındaki diyaloğu dinler.<br><br>Sistem sessizleştiğinde Qdrant Vektör veritabanına sorgu atar ve yeni oluşan anıları sağ ekranda görselleştirir.
+                <div style="text-align:center; color:var(--muted); margin-top:80px; font-size:13px; line-height:1.6; padding: 0 20px;">
+                    Bu ekran sizinle AI arasındaki diyaloğu dinler.<br><br>Siz sustuğunuz an "Otonom Bilişsel Çıkarıcı" devreye girer ve anıları Qdrant veritabanına mühürler.
                 </div>
             </div>
             <div class="control-bar"><button class="mic-btn" id="micBtn">🎤</button></div>
         </div>
 
-        <!-- SAĞ PANEL -->
         <div class="cognitive-pane">
-            <div class="extraction-loader" id="extractorLoader">⚡ OTONOM HAFIZA ÇIKARICI ÇALIŞIYOR (QDRANT EŞİTLENİYOR)...</div>
+            <div class="extraction-loader" id="extractorLoader">⚡ OTONOM HAFIZA ÇIKARICI ÇALIŞIYOR (QDRANT MÜHÜRLENİYOR)...</div>
             <div class="pane-header" style="background: transparent;">UZUN SÜRELİ HAFIZA (VECTOR DB)</div>
             <div class="memory-grid" id="memoryGrid"></div>
         </div>
@@ -123,19 +123,38 @@
         const micBtn = document.getElementById('micBtn');
         const extractorLoader = document.getElementById('extractorLoader');
         const connStatus = document.getElementById('connStatus');
+        const knowledgeApiInput = document.getElementById('knowledgeApiUrl');
         
         let client = null;
         let isRunning = false;
         let activeTurnEl = null;
         let lastExtractedText = "";
 
+        // Akıllı URL Çözümleyici (CORS ve Mixed Content Koruması)
+        function initSmartUrl() {
+            const gwUrl = import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws";
+            let apiUrl = "";
+            
+            if (gwUrl.includes("localhost") || gwUrl.includes("127.0.0.1")) {
+                apiUrl = "http://localhost:17020";
+            } else {
+                // Production: wss:// -> https:// ve port dönüşümü
+                apiUrl = gwUrl.replace("wss://", "https://").replace("/ws", "").replace("18030", "17020");
+                // Fallback Domain Hack (Eğer Stream Subdomain ise Knowledge Subdomainine çevir)
+                apiUrl = apiUrl.replace("stream-gateway", "knowledge-query");
+            }
+            knowledgeApiInput.value = apiUrl;
+        }
+        initSmartUrl();
+
         async function toggleMode() {
             if (isRunning) {
                 client?.stop();
                 micBtn.classList.remove('active');
                 document.getElementById('pulse').classList.remove('active');
-                connStatus.innerText = "Offline";
+                connStatus.innerText = "OFFLINE";
                 connStatus.style.color = "var(--muted)";
+                feed.innerHTML += `<div style="text-align:center; color:var(--muted); margin-top:20px; font-size:12px;">Oturum Sonlandırıldı.</div>`;
                 isRunning = false;
                 return;
             }
@@ -155,11 +174,11 @@
                 await client.start();
                 micBtn.classList.add('active');
                 document.getElementById('pulse').classList.add('active');
-                connStatus.innerText = "Online";
+                connStatus.innerText = "ONLINE (SECURE)";
                 connStatus.style.color = "#10b981";
                 isRunning = true;
             } catch (e) {
-                alert("Stream Gateway Bağlantı Hatası: " + e.message);
+                alert("Bağlantı Hatası: " + e.message);
             }
         }
 
@@ -175,8 +194,8 @@
                 turnDiv.dataset.sender = data.sender;
                 turnDiv.innerHTML = `
                     <div class="turn-meta" style="color:${color}">
-                        <span>${isUser ? '👤 SİZ' : '🤖 AI'}</span>
-                        <span style="opacity:0.7">${data.emotion?.toUpperCase() || 'NEUTRAL'}</span>
+                        <span>${isUser ? '👤 KULLANICI' : '🤖 SENTIRIC AI'}</span>
+                        <span style="opacity:0.7">MOD: ${data.emotion?.toUpperCase() || 'NEUTRAL'}</span>
                     </div>
                     <div class="turn-text partial"></div>
                 `;
@@ -192,7 +211,7 @@
                 if (isUser) lastExtractedText = text; 
                 
                 if (!isUser) {
-                    // AI cümlesini bitirdi. Arka plandaki Crystalline servisinin Qdrant'a yazması için 4 sn bekle.
+                    // AI konuşmasını bitirdiğinde Qdrant Senkronizasyonunu tetikle
                     triggerMemorySync();
                 }
                 activeTurnEl = null;
@@ -201,13 +220,14 @@
         }
 
         async function triggerMemorySync() {
-            if(lastExtractedText.length < 10) return;
+            if(lastExtractedText.length < 5) return;
 
             extractorLoader.classList.add('active');
             
+            // Backend'in otonom işlemini tamamlaması için 4 saniye bekle
             setTimeout(async () => {
                 try {
-                    const apiUrl = document.getElementById('knowledgeApiUrl').value.trim();
+                    const apiUrl = knowledgeApiInput.value.trim();
                     const response = await fetch(`${apiUrl}/api/v1/query`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -217,13 +237,15 @@
                     if(response.ok) {
                         const data = await response.json();
                         renderMemoryCards(data.results);
+                    } else {
+                        console.error("API Error:", await response.text());
                     }
                 } catch (e) {
-                    console.error("Qdrant Query Error (CORS veya Port hatalı olabilir):", e);
+                    console.error("Network/CORS Error. Lütfen 'Qdrant API' URL'ini kontrol edin:", e);
                 } finally {
                     extractorLoader.classList.remove('active');
                 }
-            }, 4000); // 4 Saniye (Mühürleme payı)
+            }, 4000); 
         }
 
         function renderMemoryCards(results) {
@@ -235,7 +257,8 @@
                 try {
                     const fact = JSON.parse(item.metadata.raw);
                     const cardId = btoa(encodeURIComponent(fact.summary)).substring(0, 15);
-                    if(document.getElementById(`mem-${cardId}`)) return;
+                    
+                    if(document.getElementById(`mem-${cardId}`)) return; // Zaten ekrandaysa atla
 
                     const card = document.createElement('div');
                     card.id = `mem-${cardId}`;
@@ -250,30 +273,31 @@
                     card.innerHTML = `
                         <div class="card-category">
                             <span>● ${fact.category}</span>
-                            <span style="background: ${accentColor}20; padding: 2px 8px; border-radius: 4px;">ÖNEM: ${fact.importance}</span>
+                            <span style="background: ${accentColor}20; padding: 4px 8px; border-radius: 6px;">ÖNEM: ${fact.importance}/5</span>
                         </div>
                         <div class="card-summary">"${fact.summary}"</div>
                         <div class="card-tags">${tagsHtml}</div>
                     `;
                     grid.prepend(card);
-                } catch(e) { console.error("Fact parse error:", e); }
+                } catch(e) { console.error("Memory render failed:", e); }
             });
         }
 
         function handleMoodShift(statusStr) {
             try {
                 const status = JSON.parse(statusStr);
-                if (status.type === "MOOD_SHIFT" && (Math.abs(status.arousal_shift) > 0.5 || status.new_mood === 'angry')) {
+                if (status.type === "MOOD_SHIFT" && (Math.abs(status.arousal_shift) > 0.4 || status.new_mood === 'angry')) {
                     const card = document.createElement('div');
                     card.className = 'memory-card critical';
                     card.style.setProperty('--card-color', '#ef4444');
+                    card.style.background = 'rgba(239, 68, 68, 0.05)';
                     card.innerHTML = `
                         <div class="card-category" style="color:#ef4444">
-                            <span>🚨 BİLİŞSEL REFLEKS</span>
+                            <span>🚨 BİLİŞSEL REFLEKS TETİKLENDİ</span>
                             <span>ANOMALİ</span>
                         </div>
-                        <div class="card-summary" style="color:#f8fafc;">
-                            Kullanıcının ruh hali aniden <b>${status.new_mood.toUpperCase()}</b> moduna geçti. Dialog sistemi uyarıldı.
+                        <div class="card-summary" style="color:#fca5a5;">
+                            Kullanıcının ruh hali aniden <b>${status.new_mood.toUpperCase()}</b> moduna geçti. Dialog servisi otonom olarak uyarıldı.
                         </div>
                     `;
                     grid.prepend(card);
