@@ -44,7 +44,9 @@
             gap: 10px;
         }
 
-        .header-title span { color: var(--accent); }
+        .header-title span {
+            color: var(--accent);
+        }
 
         .live-indicator {
             width: 10px;
@@ -56,7 +58,9 @@
             display: none;
         }
 
-        .live-indicator.active { display: block; }
+        .live-indicator.active {
+            display: block;
+        }
 
         .workspace {
             display: flex;
@@ -200,16 +204,20 @@
             transform: translateY(-4px);
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
         }
-        
+
         /* Önem Derecesi Yüksek (4 ve 5) Olanlar İçin Glow Efekti */
         .memory-card.critical {
             border-color: #f59e0b;
             box-shadow: 0 0 15px rgba(245, 158, 11, 0.1);
         }
+
         .memory-card.critical::before {
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0; height: 2px;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
             background: linear-gradient(90deg, transparent, #f59e0b, transparent);
         }
 
@@ -228,16 +236,17 @@
             line-height: 1.6;
             color: #e4e4e7;
         }
-        
+
         .card-tags {
             display: flex;
             gap: 6px;
             flex-wrap: wrap;
             margin-top: 12px;
         }
+
         .tag {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             padding: 2px 8px;
             border-radius: 12px;
             font-size: 10px;
@@ -283,12 +292,78 @@
             animation: ping 1.5s infinite;
         }
 
-        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes ping { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.5); opacity: 0; } }
-        @keyframes typing { 0% { opacity: 0.3; } 100% { opacity: 1; } }
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(1.2);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes ping {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        @keyframes typing {
+            0% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
     </style>
   <script type="module" crossorigin src="../cognitive.js"></script>
   <link rel="modulepreload" crossorigin href="../assets/modulepreload-polyfill-CNgwewHt.js">
@@ -298,7 +373,8 @@
 <body>
 
     <div class="header">
-        <div class="header-title">🧠 COGNITIVE <span>CANVAS v4.0</span> <div class="live-indicator" id="liveInd"></div>
+        <div class="header-title">🧠 COGNITIVE <span>CANVAS v4.0</span>
+            <div class="live-indicator" id="liveInd"></div>
         </div>
         <a href="../index.html"
             style="color:var(--muted); text-decoration:none; font-size: 12px; font-weight:600;">&larr; Vitrine Dön</a>
@@ -317,7 +393,8 @@
         </div>
 
         <div class="canvas-pane">
-            <div class="pane-title" style="border-bottom: 1px solid rgba(255,255,255,0.05);">LONG-TERM MEMORY (BİLİŞSEL ÇAPA)</div>
+            <div class="pane-title" style="border-bottom: 1px solid rgba(255,255,255,0.05);">LONG-TERM MEMORY (BİLİŞSEL
+                ÇAPA)</div>
 
             <!-- Canlı Düşünce Akışı -->
             <div class="llm-stream-box" id="llmBox">
@@ -329,7 +406,8 @@
             <div class="memory-area">
                 <div
                     style="color:var(--muted); font-size:13px; max-width:700px; line-height: 1.5; margin-bottom: 20px;">
-                    Sistem konuşmalarınızı dinler, "Atomik Gerçeklere" böler ve Qdrant Vektör veritabanına mühürler. Önem derecesi (1-5) yüksek olanlar parlar.
+                    Sistem konuşmalarınızı dinler, "Atomik Gerçeklere" böler ve Qdrant Vektör veritabanına mühürler.
+                    Önem derecesi (1-5) yüksek olanlar parlar.
                 </div>
                 <div class="card-grid" id="memoryGrid"></div>
             </div>
@@ -337,4 +415,5 @@
     </div>
 
 </body>
+
 </html>
