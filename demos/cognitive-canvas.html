@@ -1,419 +1,99 @@
 <!DOCTYPE html>
 <html lang="tr">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cognitive Canvas v4.0 | Sentiric OS</title>
+    <title>Cognitive Canvas v6.0 | Sentiric OS</title>
     <style>
         :root {
-            --bg: #09090b;
-            --panel: #18181b;
-            --accent: #3b82f6;
-            --text: #f4f4f5;
-            --muted: #a1a1aa;
+            --bg: #030712; --panel: #0f172a; --accent: #38bdf8; --text: #f8fafc; --muted: #64748b;
         }
-
         body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text);
+            margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
         }
-
         .header {
-            padding: 15px 24px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--panel);
-            z-index: 10;
+            padding: 15px 24px; border-bottom: 1px solid rgba(255,255,255,0.05); background: var(--panel);
+            display: flex; justify-content: space-between; align-items: center; z-index: 10;
         }
-
-        .header-title {
-            font-weight: 900;
-            font-size: 18px;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .header-title { font-weight: 900; font-size: 18px; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
+        .header-title span { color: var(--accent); }
+        .pulse { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981; animation: blink 2s infinite; display: none; }
+        .pulse.active { display: block; }
+        
+        .workspace { display: flex; flex: 1; overflow: hidden; }
+        
+        /* Sensory Input (Left) */
+        .sensory-pane { width: 35%; border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; background: var(--bg); }
+        .pane-header { padding: 12px 20px; font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 2px; background: var(--panel); border-bottom: 1px solid rgba(255,255,255,0.02); }
+        .feed { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        
+        .turn { animation: fadeIn 0.3s ease; }
+        .turn-meta { font-size: 10px; font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .turn-text { font-size: 15px; line-height: 1.6; color: #cbd5e1; }
+        .turn-text.partial { opacity: 0.5; font-style: italic; }
+        
+        /* Cognitive Core (Right) */
+        .cognitive-pane { width: 65%; background: radial-gradient(circle at top, #0f172a 0%, #030712 100%); display: flex; flex-direction: column; position: relative; }
+        
+        .extraction-loader {
+            position: absolute; top: 0; left: 0; right: 0; background: rgba(56, 189, 248, 0.1); border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 10px; font-size: 11px; font-weight: 700; color: var(--accent); text-align: center; letter-spacing: 2px;
+            transform: translateY(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 5;
         }
-
-        .header-title span {
-            color: var(--accent);
-        }
-
-        .live-indicator {
-            width: 10px;
-            height: 10px;
-            background: #10b981;
-            border-radius: 50%;
-            box-shadow: 0 0 10px #10b981;
-            animation: pulse 2s infinite;
-            display: none;
-        }
-
-        .live-indicator.active {
-            display: block;
-        }
-
-        .workspace {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        /* SOL EKRAN (Kulak) */
-        .transcript-pane {
-            width: 35%;
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            flex-direction: column;
-            background: var(--bg);
-        }
-
-        .pane-title {
-            padding: 12px 20px;
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--muted);
-            letter-spacing: 2px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            background: var(--panel);
-        }
-
-        .feed {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            scroll-behavior: smooth;
-        }
-
-        .turn {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .turn-meta {
-            display: flex;
-            justify-content: space-between;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-
-        .turn-text {
-            font-size: 15px;
-            line-height: 1.6;
-            color: #d4d4d8;
-        }
-
-        .turn-text.partial {
-            opacity: 0.5;
-            font-style: italic;
-        }
-
-        /* SAĞ EKRAN (Beyin) */
-        .canvas-pane {
-            width: 65%;
-            background: radial-gradient(circle at center, #18181b 0%, #09090b 100%);
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Canlı Düşünce Akışı */
-        .llm-stream-box {
-            background: rgba(139, 92, 246, 0.05);
-            border-bottom: 1px solid rgba(139, 92, 246, 0.2);
-            padding: 20px 30px;
-            display: none;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .llm-stream-box.active {
-            display: flex;
-            animation: slideDown 0.3s ease;
-        }
-
-        .llm-title {
-            font-size: 11px;
-            font-weight: 700;
-            color: #8B5CF6;
-            letter-spacing: 2px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .llm-text {
-            font-size: 15px;
-            line-height: 1.6;
-            color: #e4e4e7;
-            font-family: 'JetBrains Mono', monospace;
-            white-space: pre-wrap;
-        }
-
-        .loader-dots {
-            display: inline-block;
-            width: 4px;
-            height: 4px;
-            background: #8B5CF6;
-            border-radius: 50%;
-            box-shadow: 8px 0 0 #8B5CF6, 16px 0 0 #8B5CF6;
-            animation: typing 1s infinite alternate;
-            margin-left: 5px;
-        }
-
-        /* Kalıcı Hafıza Kartları (Atomik Birimler) */
-        .memory-area {
-            flex: 1;
-            padding: 30px;
-            overflow-y: auto;
-        }
-
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
-        }
-
+        .extraction-loader.active { transform: translateY(0); }
+        
+        .memory-grid { padding: 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; overflow-y: auto; flex: 1; }
+        
         .memory-card {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
-            transition: 0.3s;
-            animation: slideUp 0.4s ease;
-            position: relative;
-            overflow: hidden;
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 20px;
+            backdrop-filter: blur(10px); animation: slideUp 0.4s ease; position: relative; overflow: hidden;
         }
-
-        .memory-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        .memory-card::before {
+            content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 4px; background: var(--card-color, #38bdf8);
         }
+        .memory-card.critical { box-shadow: 0 0 20px rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.3); }
+        
+        .card-category { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--card-color, #38bdf8); text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between;}
+        .card-summary { font-size: 14px; line-height: 1.6; color: #f8fafc; }
+        .card-tags { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+        .tag { background: rgba(255,255,255,0.05); padding: 3px 8px; border-radius: 6px; font-size: 10px; color: var(--muted); }
 
-        /* Önem Derecesi Yüksek (4 ve 5) Olanlar İçin Glow Efekti */
-        .memory-card.critical {
-            border-color: #f59e0b;
-            box-shadow: 0 0 15px rgba(245, 158, 11, 0.1);
-        }
-
-        .memory-card.critical::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #f59e0b, transparent);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            font-size: 11px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .card-body {
-            font-size: 14px;
-            line-height: 1.6;
-            color: #e4e4e7;
-        }
-
-        .card-tags {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-top: 12px;
-        }
-
-        .tag {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 10px;
-            color: var(--muted);
-        }
-
-        .control-bar {
-            padding: 20px;
-            background: var(--panel);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            justify-content: center;
-        }
-
+        .control-bar { padding: 20px; background: var(--panel); border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: center; }
         .mic-btn {
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            background: var(--text);
-            color: var(--bg);
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            transition: 0.3s;
-            display: grid;
-            place-items: center;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            width: 60px; height: 60px; border-radius: 50%; background: var(--text); color: var(--bg); border: none; font-size: 24px;
+            cursor: pointer; transition: 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
+        .mic-btn.active { background: #ef4444; color: white; box-shadow: 0 0 20px rgba(239, 68, 68, 0.4); }
 
-        .mic-btn.active {
-            background: #ef4444;
-            color: white;
-            box-shadow: 0 0 25px rgba(239, 68, 68, 0.5);
-        }
-
-        .mic-btn.active::after {
-            content: "";
-            position: absolute;
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            border: 2px solid #ef4444;
-            animation: ping 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% {
-                opacity: 1;
-                transform: scale(1);
-            }
-
-            50% {
-                opacity: 0.5;
-                transform: scale(1.2);
-            }
-
-            100% {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes ping {
-            0% {
-                transform: scale(1);
-                opacity: 0.8;
-            }
-
-            100% {
-                transform: scale(1.5);
-                opacity: 0;
-            }
-        }
-
-        @keyframes typing {
-            0% {
-                opacity: 0.3;
-            }
-
-            100% {
-                opacity: 1;
-            }
-        }
+        @keyframes blink { 50% { opacity: 0.4; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
   <script type="module" crossorigin src="../cognitive.js"></script>
   <link rel="modulepreload" crossorigin href="../assets/modulepreload-polyfill-CNgwewHt.js">
   <link rel="modulepreload" crossorigin href="../stream-sdk.js">
 </head>
-
 <body>
 
     <div class="header">
-        <div class="header-title">🧠 COGNITIVE <span>CANVAS v4.0</span>
-            <div class="live-indicator" id="liveInd"></div>
-        </div>
-        <a href="../index.html"
-            style="color:var(--muted); text-decoration:none; font-size: 12px; font-weight:600;">&larr; Vitrine Dön</a>
+        <div class="header-title">🧠 COGNITIVE <span>CANVAS v6.0</span> <div class="pulse" id="pulse"></div></div>
+        <a href="../index.html" style="color:var(--muted); text-decoration:none; font-size: 12px; font-weight:600;">&larr; Vitrine Dön</a>
     </div>
 
     <div class="workspace">
-        <div class="transcript-pane">
-            <div class="pane-title">SENSORY INPUT (İŞİTSEL KORTEKS)</div>
-            <div class="feed" id="feed">
-                <div style="text-align:center; color:var(--muted); margin-top: 40px; font-size: 13px;">Bağlantı
-                    bekleniyor...</div>
-            </div>
-            <div class="control-bar">
-                <button class="mic-btn" id="micBtn" title="Zihne Bağlan">🎤</button>
-            </div>
+        <div class="sensory-pane">
+            <div class="pane-header">SENSORY INPUT (İŞİTSEL KORTEKS)</div>
+            <div class="feed" id="feed"><div style="text-align:center; color:var(--muted); margin-top:40px; font-size:12px;">Sistem Uyku Modunda.</div></div>
+            <div class="control-bar"><button class="mic-btn" id="micBtn">🎤</button></div>
         </div>
 
-        <div class="canvas-pane">
-            <div class="pane-title" style="border-bottom: 1px solid rgba(255,255,255,0.05);">LONG-TERM MEMORY (BİLİŞSEL
-                ÇAPA)</div>
-
-            <!-- Canlı Düşünce Akışı -->
-            <div class="llm-stream-box" id="llmBox">
-                <div class="llm-title">ATOMİK HAFIZA AYRIŞTIRICISI ÇALIŞIYOR <span class="loader-dots"></span></div>
-                <div class="llm-text" id="llmText"></div>
-            </div>
-
-            <!-- Kalıcı Kartlar -->
-            <div class="memory-area">
-                <div
-                    style="color:var(--muted); font-size:13px; max-width:700px; line-height: 1.5; margin-bottom: 20px;">
-                    Sistem konuşmalarınızı dinler, "Atomik Gerçeklere" böler ve Qdrant Vektör veritabanına mühürler.
-                    Önem derecesi (1-5) yüksek olanlar parlar.
-                </div>
-                <div class="card-grid" id="memoryGrid"></div>
-            </div>
+        <div class="cognitive-pane">
+            <div class="extraction-loader" id="extractorLoader">⚡ OTONOM HAFIZA ÇIKARICI QDRANT'A YAZIYOR...</div>
+            <div class="pane-header">LONG-TERM MEMORY (QDRANT VECTOR DB)</div>
+            <div class="memory-grid" id="memoryGrid"></div>
         </div>
     </div>
 
 </body>
-
 </html>
