@@ -223,8 +223,11 @@
             if(lastExtractedText.length < 5) return;
 
             extractorLoader.classList.add('active');
+            extractorLoader.innerText = "⚡ OTONOM HAFIZA ÇIKARICI ÇALIŞIYOR (QDRANT MÜHÜRLENİYOR)...";
+            extractorLoader.style.color = "var(--accent)";
+            extractorLoader.style.background = "rgba(56, 189, 248, 0.15)";
             
-            // Backend'in otonom işlemini tamamlaması için 4 saniye bekle
+            // LLM'in işlemesi için 5 saniye bekle
             setTimeout(async () => {
                 try {
                     const apiUrl = knowledgeApiInput.value.trim();
@@ -237,15 +240,22 @@
                     if(response.ok) {
                         const data = await response.json();
                         renderMemoryCards(data.results);
+                        extractorLoader.classList.remove('active');
                     } else {
-                        console.error("API Error:", await response.text());
+                        // 502 Bad Gateway veya Backend Hatası
+                        throw new Error(`HTTP ${response.status}: API Gateway Hatası`);
                     }
                 } catch (e) {
-                    console.error("Network/CORS Error. Lütfen 'Qdrant API' URL'ini kontrol edin:", e);
-                } finally {
-                    extractorLoader.classList.remove('active');
+                    console.error("Knowledge API Fetch Error:", e);
+                    // UI Üzerinde Kullanıcıyı Bilgilendir
+                    extractorLoader.innerText = "🚨 CORS / 502 HATASI: Qdrant API URL'ine erişilemiyor. Lütfen DNS veya Backend ayarlarını kontrol edin.";
+                    extractorLoader.style.color = "#ef4444";
+                    extractorLoader.style.background = "rgba(239, 68, 68, 0.15)";
+                    
+                    // Hatayı 5 saniye gösterip kapat
+                    setTimeout(() => { extractorLoader.classList.remove('active'); }, 5000);
                 }
-            }, 4000); 
+            }, 5000); 
         }
 
         function renderMemoryCards(results) {
