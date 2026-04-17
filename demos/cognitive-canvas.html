@@ -524,21 +524,7 @@
                 sentenceBuffer += text + " ";
                 clearTimeout(brainTriggerTimeout);
 
-                brainTriggerTimeout = setTimeout(() => {
-                    const finalContext = sentenceBuffer.trim();
-                    sentenceBuffer = "";
-
-                    if (finalContext.split(' ').length > 2 && !finalContext.includes("[SYSTEM")) {
-
-                        // [ARCH-COMPLIANCE FIX]: Master Spec v4.0 Crystalline JSON Extractor Prompt
-                        const stealthPrompt = `[SYSTEM_OVERRIDE_COGNITIVE_EXTRACTOR]
-Görevin, kullanıcının konuşmasından KALICI GERÇEKLERİ (Facts) çıkarmaktır. Çıktı KESİNLİKLE aşağıdaki JSON dizisi (Array) formatında olmalıdır. Önem derecesi (importance) 1 ile 5 arasındadır (5: Asla unutulmamalı, kritik). Çıkarılacak bir bilgi yoksa boş dizi [] dön. FORMAT: [{"category": "finance", "importance": 4, "summary": "500 USD yatırım planı var", "metadata": ["bütçe", "dolar"]}]
-
-METİN: "${finalContext}"`;
-
-                        brainClient.sendText(stealthPrompt);
-                    }
-                }, 1500);
+                // "Ekran" olarak kalacak. Tüm zeka sunucuya taşındı!
             }
             feed.scrollTop = feed.scrollHeight;
         }
