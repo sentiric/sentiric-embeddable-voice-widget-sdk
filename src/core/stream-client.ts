@@ -10,6 +10,7 @@ import { Logger } from "../utils/logger";
 export interface StreamClientOptions {
   gatewayUrl: string;
   tenantId: string;
+  userId?: string; // [YENİ]: Kullanıcıyı sekmeler arası hatırlamak için
   traceId?: string;
   sessionId?: string;
   token?: string;
@@ -38,20 +39,29 @@ function generateUUID() {
 
 export class SentiricStreamClient {
   private ws: WebSocket | null = null;
-  private options: StreamClientOptions;
+  public options: StreamClientOptions; // public yapıldı
   private isReady: boolean = false;
   private audioManager: SentiricAudioManager | null = null;
-
-  // QA Recorder Değişkenleri
   private qaLog: any[] = [];
   private activeAiText: string = "";
 
   public readonly traceId: string;
   public readonly sessionId: string;
+  public readonly userId: string;
 
   constructor(options: StreamClientOptions) {
     this.traceId = options.traceId || generateUUID();
     this.sessionId = options.sessionId || generateUUID();
+
+    // [ARCH-COMPLIANCE FIX]: Eğer userId verilmemişse, LocalStorage'dan persistent bir ID al.
+    // Bu sayede demo ortamında sekmeler arası "Bilişsel Hafıza" kopmaz.
+    let storedUserId = localStorage.getItem("sentiric_demo_uid");
+    if (!storedUserId) {
+      storedUserId = "usr_" + generateUUID().split("-")[0];
+      localStorage.setItem("sentiric_demo_uid", storedUserId);
+    }
+    this.userId = options.userId || storedUserId;
+
     this.options = {
       language: "tr-TR",
       sampleRate: 16000,
@@ -69,6 +79,7 @@ export class SentiricStreamClient {
 
   private async connect(): Promise<void> {
     return new Promise((resolve) => {
+      // trace_id'yi gateway'e URL üzerinden iletiyoruz
       const urlWithTrace = `${this.options.gatewayUrl}?trace_id=${this.traceId}`;
       this.ws = new WebSocket(urlWithTrace);
       this.ws.binaryType = "arraybuffer";
@@ -86,6 +97,7 @@ export class SentiricStreamClient {
             chatOnlyMode: this.options.chatOnlyMode!,
             traceId: this.traceId,
             sessionId: this.sessionId,
+            // userId: this.userId, <--- BU SATIRI SİLDİK
             systemPromptId: this.options.systemPromptId,
             ttsVoiceId: this.options.ttsVoiceId,
           },
@@ -100,7 +112,7 @@ export class SentiricStreamClient {
     });
   }
 
-  private sendInterrupt() {
+  public sendInterrupt() {
     if (!this.isReady || !this.ws) return;
     this.ws.send(
       StreamSessionRequest.encode(
@@ -109,7 +121,7 @@ export class SentiricStreamClient {
     );
   }
 
-  private sendEos() {
+  public sendEos() {
     if (!this.isReady || !this.ws) return;
     this.ws.send(
       StreamSessionRequest.encode(
@@ -118,7 +130,7 @@ export class SentiricStreamClient {
     );
   }
 
-  private sendAudio(chunk: Uint8Array) {
+  public sendAudio(chunk: Uint8Array) {
     if (!this.isReady || !this.ws) return;
     this.ws.send(
       StreamSessionRequest.encode(
@@ -134,7 +146,7 @@ export class SentiricStreamClient {
         StreamSessionRequest.fromPartial({ textMessage: text }),
       ).finish(),
     );
-    this.sendEos(); // LLM'i anında tetikler
+    this.sendEos();
   }
 
   private handleMessage(data: ArrayBuffer) {
@@ -158,13 +170,13 @@ export class SentiricStreamClient {
             this.qaLog.push({
               timestamp: new Date().toISOString(),
               speaker: "USER",
-              speaker_id: t.speakerId || (t as any).speaker_id || "?",
+              speaker_id: t.speakerId || "?",
               emotion: t.emotion || "neutral",
               text,
             });
           }
         } else if (sender === "AI") {
-          this.activeAiText = text; // Sürekli güncel tut
+          this.activeAiText = text;
           if (isFinal) {
             this.audioManager?.setAiSpeaking(false);
             this.qaLog.push({
@@ -175,17 +187,16 @@ export class SentiricStreamClient {
             this.activeAiText = "";
           }
         }
-
         try {
           if (this.options.onTranscript) this.options.onTranscript(t);
-        } catch {} // (e) silindi
+        } catch {}
       } else if (message.clearAudioBuffer) {
         this.audioManager?.flushPlayback();
       } else if (message.statusUpdate) {
         try {
           if (this.options.onStatusUpdate)
             this.options.onStatusUpdate(message.statusUpdate);
-        } catch {} // (e) silindi
+        } catch {}
       }
     } catch (e) {
       Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });
@@ -196,8 +207,6 @@ export class SentiricStreamClient {
     this.isReady = false;
     this.ws?.close();
     this.audioManager?.stop();
-
-    // Eğer bağlantı koptuğunda AI'ın elinde yarım kalmış (isFinal gelmemiş) bir text varsa onu da kaydet!
     if (this.activeAiText.trim().length > 0) {
       this.qaLog.push({
         timestamp: new Date().toISOString(),
@@ -206,12 +215,7 @@ export class SentiricStreamClient {
       });
       this.activeAiText = "";
     }
-
     Logger.info("SESSION_STOPPED", "User ended session.");
-    console.log("\n==================================================");
-    console.log("🧠 QA TEST REPORT (KOPYALAYIP AI'A GÖNDERİN):");
-    console.log(JSON.stringify(this.qaLog, null, 2));
-    console.log("==================================================\n");
   }
 
   public async start(): Promise<void> {
@@ -222,7 +226,11 @@ export class SentiricStreamClient {
       this.options.sampleRate,
     );
     await this.connect();
-    if (!this.options.chatOnlyMode && !this.options.speakOnlyMode) {
+    if (
+      !this.options.chatOnlyMode &&
+      !this.options.speakOnlyMode &&
+      !this.options.listenOnlyMode
+    ) {
       await this.audioManager.startMicrophone();
     }
     Logger.info("SESSION_ACTIVE", "AI Session started successfully.");

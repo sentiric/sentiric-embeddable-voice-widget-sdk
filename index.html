@@ -1,37 +1,137 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="https://sentiric.github.io/sentiric-assets/image/favicon.svg">
     <title>Sentiric OS | Communication SDK Showroom</title>
     <style>
-        :root { --bg: #f8fafc; --primary: #4f46e5; --text: #0f172a; --border: #e2e8f0; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; line-height: 1.5; }
-        nav { background: #fff; border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-        .logo { font-size: 1.25rem; font-weight: 800; color: var(--primary); letter-spacing: -1px; }
-        .hero { padding: 5rem 2rem; text-align: center; background: white; border-bottom: 1px solid var(--border); }
-        .hero h1 { font-size: 3.5rem; font-weight: 900; margin: 0; color: #1e1b4b; }
-        .hero p { font-size: 1.25rem; color: #64748b; max-width: 700px; margin: 1.5rem auto; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 4rem 2rem; }
-        
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; }
-        .demo-card { 
-            background: #fff; border: 1px solid var(--border); border-radius: 1.25rem; 
-            padding: 2.5rem; transition: transform 0.3s, box-shadow 0.3s; 
-            display: flex; flex-direction: column; text-decoration: none; color: inherit;
+        :root {
+            --bg: #f8fafc;
+            --primary: #4f46e5;
+            --text: #0f172a;
+            --border: #e2e8f0;
         }
-        .demo-card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); border-color: var(--primary); }
-        .card-icon { font-size: 3rem; margin-bottom: 1rem; }
-        .demo-card h3 { margin: 0 0 0.5rem 0; color: #1e1b4b; font-size: 1.5rem; }
-        .demo-card p { color: #64748b; margin: 0 0 1.5rem 0; flex-grow: 1; }
-        .launch-btn { 
-            background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; 
-            border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: inline-block; text-align: center;
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            line-height: 1.5;
         }
-        .v-badge { background: #f1f5f9; padding: 0.2rem 0.6rem; border-radius: 2rem; font-size: 0.7rem; font-family: monospace; color: #64748b; }
+
+        nav {
+            background: #fff;
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -1px;
+        }
+
+        .hero {
+            padding: 5rem 2rem;
+            text-align: center;
+            background: white;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin: 0;
+            color: #1e1b4b;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: #64748b;
+            max-width: 700px;
+            margin: 1.5rem auto;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+        }
+
+        .demo-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 1.25rem;
+            padding: 2.5rem;
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .demo-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+            border-color: var(--primary);
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .demo-card h3 {
+            margin: 0 0 0.5rem 0;
+            color: #1e1b4b;
+            font-size: 1.5rem;
+        }
+
+        .demo-card p {
+            color: #64748b;
+            margin: 0 0 1.5rem 0;
+            flex-grow: 1;
+        }
+
+        .launch-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .v-badge {
+            background: #f1f5f9;
+            padding: 0.2rem 0.6rem;
+            border-radius: 2rem;
+            font-size: 0.7rem;
+            font-family: monospace;
+            color: #64748b;
+        }
     </style>
 </head>
+
 <body>
     <nav>
         <div class="logo">SENTIRIC OS.</div>
@@ -39,16 +139,18 @@
     </nav>
     <header class="hero">
         <h1>Geleceği Sesinizle Yönetin.</h1>
-        <p>Sentiric Stream SDK vitrinine hoş geldiniz. Ekosistemin gücünü görmek için aşağıdaki canlı demo ortamlarından birini seçin.</p>
+        <p>Sentiric Stream SDK vitrinine hoş geldiniz. Ekosistemin gücünü görmek için aşağıdaki canlı demo ortamlarından
+            birini seçin.</p>
     </header>
-    
+
     <main class="container">
-<div class="grid">
+        <div class="grid">
             <!-- DEMO 1: Interactive Agent -->
             <a href="demos/interactive-agent.html" class="demo-card">
                 <div class="card-icon">🤖</div>
                 <h3>Voice Agent (Interactive)</h3>
-                <p>Standart sesli asistan. Sizi dinler, niyetinizi anlar ve LLM/TTS döngüsüyle cevap verir. (Zero-Latency Barge-in aktif)</p>
+                <p>Standart sesli asistan. Sizi dinler, niyetinizi anlar ve LLM/TTS döngüsüyle cevap verir.
+                    (Zero-Latency Barge-in aktif)</p>
                 <div class="launch-btn">Demoyu Başlat &rarr;</div>
             </a>
 
@@ -56,7 +158,8 @@
             <a href="demos/meeting-analyst.html" class="demo-card">
                 <div class="card-icon">👁️</div>
                 <h3>Gözlemci / Analist Modu</h3>
-                <p>Sistemi sessiz bir dinleyiciye çevirir. Sesi metne çevirir, konuşmacıları ayrıştırır ve duygularını (Affective) analiz eder.</p>
+                <p>Sistemi sessiz bir dinleyiciye çevirir. Sesi metne çevirir, konuşmacıları ayrıştırır ve duygularını
+                    (Affective) analiz eder.</p>
                 <div class="launch-btn">Demoyu Başlat &rarr;</div>
             </a>
 
@@ -64,7 +167,8 @@
             <a href="demos/megaphone.html" class="demo-card">
                 <div class="card-icon">📢</div>
                 <h3>Megafon / Broadcast Modu</h3>
-                <p>Sistemi dev bir megafona çevirir. STT ve LLM atlanır, yazdığınız metin sıfır gecikmeyle sese dönüştürülüp size akar.</p>
+                <p>Sistemi dev bir megafona çevirir. STT ve LLM atlanır, yazdığınız metin sıfır gecikmeyle sese
+                    dönüştürülüp size akar.</p>
                 <div class="launch-btn">Demoyu Başlat &rarr;</div>
             </a>
 
@@ -72,7 +176,8 @@
             <a href="demos/omni-chat.html" class="demo-card">
                 <div class="card-icon">💬</div>
                 <h3>Omni-Chat (Web & Mobile)</h3>
-                <p>Sadece metin (Text) tabanlı müşteri hizmetleri. STT ve TTS atlanır, LLM'den gelen zeka daktilo efektiyle anında ekrana akar.</p>
+                <p>Sadece metin (Text) tabanlı müşteri hizmetleri. STT ve TTS atlanır, LLM'den gelen zeka daktilo
+                    efektiyle anında ekrana akar.</p>
                 <div class="launch-btn">Demoyu Başlat &rarr;</div>
             </a>
 
@@ -80,7 +185,8 @@
             <a href="demos/cognitive-canvas.html" class="demo-card" style="border-color: #8b5cf6;">
                 <div class="card-icon">🧠</div>
                 <h3>Cognitive Canvas (İkinci Beyin)</h3>
-                <p>Dağınık ve uzun konuşmaları analiz eder. Ekranı ikiye böler; solda ham konuşmayı, sağda ise yapay zekanın beyninde oluşan "Hafıza Kartlarını" izlersiniz.</p>
+                <p>Dağınık ve uzun konuşmaları analiz eder. Ekranı ikiye böler; solda ham konuşmayı, sağda ise yapay
+                    zekanın beyninde oluşan "Hafıza Kartlarını" izlersiniz.</p>
                 <div class="launch-btn" style="background: #8b5cf6;">Zihne Gir &rarr;</div>
             </a>
 
@@ -88,7 +194,8 @@
             <div class="demo-card" style="opacity: 0.6; cursor: not-allowed;">
                 <div class="card-icon">🎧</div>
                 <h3>Agent Assist (Sufle)</h3>
-                <p>Yakında! Müşteri temsilcisi konuşurken AI arka planda dinler ve cevapları ekrana metin olarak yazar.</p>
+                <p>Yakında! Müşteri temsilcisi konuşurken AI arka planda dinler ve cevapları ekrana metin olarak yazar.
+                </p>
                 <div class="launch-btn" style="background: #94a3b8">Hazırlanıyor</div>
             </div>
 
@@ -96,7 +203,8 @@
             <div class="demo-card" style="opacity: 0.6; cursor: not-allowed;">
                 <div class="card-icon">🥷</div>
                 <h3>Silent Commander (IoT)</h3>
-                <p>Yakında! Sadece sesli komut alıp JSON olarak eylem (Aksiyon) fırlatır. Akıllı evler ve donanımlar için.</p>
+                <p>Yakında! Sadece sesli komut alıp JSON olarak eylem (Aksiyon) fırlatır. Akıllı evler ve donanımlar
+                    için.</p>
                 <div class="launch-btn" style="background: #94a3b8">Hazırlanıyor</div>
             </div>
         </div>
@@ -106,4 +214,5 @@
         document.getElementById('app-version').innerText = `SDK v${__APP_VERSION__}`;
     </script>
 </body>
+
 </html>

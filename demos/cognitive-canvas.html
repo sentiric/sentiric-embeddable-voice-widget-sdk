@@ -44,7 +44,9 @@
             gap: 10px;
         }
 
-        .header-title span { color: var(--accent); }
+        .header-title span {
+            color: var(--accent);
+        }
 
         .live-indicator {
             width: 10px;
@@ -56,7 +58,9 @@
             display: none;
         }
 
-        .live-indicator.active { display: block; }
+        .live-indicator.active {
+            display: block;
+        }
 
         .workspace {
             display: flex;
@@ -200,16 +204,20 @@
             transform: translateY(-4px);
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
         }
-        
+
         /* Önem Derecesi Yüksek (4 ve 5) Olanlar İçin Glow Efekti */
         .memory-card.critical {
             border-color: #f59e0b;
             box-shadow: 0 0 15px rgba(245, 158, 11, 0.1);
         }
+
         .memory-card.critical::before {
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0; height: 2px;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
             background: linear-gradient(90deg, transparent, #f59e0b, transparent);
         }
 
@@ -228,16 +236,17 @@
             line-height: 1.6;
             color: #e4e4e7;
         }
-        
+
         .card-tags {
             display: flex;
             gap: 6px;
             flex-wrap: wrap;
             margin-top: 12px;
         }
+
         .tag {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             padding: 2px 8px;
             border-radius: 12px;
             font-size: 10px;
@@ -283,19 +292,86 @@
             animation: ping 1.5s infinite;
         }
 
-        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes ping { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.5); opacity: 0; } }
-        @keyframes typing { 0% { opacity: 0.3; } 100% { opacity: 1; } }
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(1.2);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes ping {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        @keyframes typing {
+            0% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 
 <body>
 
     <div class="header">
-        <div class="header-title">🧠 COGNITIVE <span>CANVAS v4.0</span> <div class="live-indicator" id="liveInd"></div>
+        <div class="header-title">🧠 COGNITIVE <span>CANVAS v4.0</span>
+            <div class="live-indicator" id="liveInd"></div>
         </div>
         <a href="../index.html"
             style="color:var(--muted); text-decoration:none; font-size: 12px; font-weight:600;">&larr; Vitrine Dön</a>
@@ -314,7 +390,8 @@
         </div>
 
         <div class="canvas-pane">
-            <div class="pane-title" style="border-bottom: 1px solid rgba(255,255,255,0.05);">LONG-TERM MEMORY (BİLİŞSEL ÇAPA)</div>
+            <div class="pane-title" style="border-bottom: 1px solid rgba(255,255,255,0.05);">LONG-TERM MEMORY (BİLİŞSEL
+                ÇAPA)</div>
 
             <!-- Canlı Düşünce Akışı -->
             <div class="llm-stream-box" id="llmBox">
@@ -326,7 +403,8 @@
             <div class="memory-area">
                 <div
                     style="color:var(--muted); font-size:13px; max-width:700px; line-height: 1.5; margin-bottom: 20px;">
-                    Sistem konuşmalarınızı dinler, "Atomik Gerçeklere" böler ve Qdrant Vektör veritabanına mühürler. Önem derecesi (1-5) yüksek olanlar parlar.
+                    Sistem konuşmalarınızı dinler, "Atomik Gerçeklere" böler ve Qdrant Vektör veritabanına mühürler.
+                    Önem derecesi (1-5) yüksek olanlar parlar.
                 </div>
                 <div class="card-grid" id="memoryGrid"></div>
             </div>
@@ -378,6 +456,7 @@
             client = new SentiricStreamClient({
                 gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
                 tenantId: "demo-tenant",
+                userId: "demo-ceo-123", // [YENİ]
                 language: "tr-TR",
                 chatOnlyMode: true
             });
@@ -389,11 +468,13 @@
             window.earClient = new SentiricStreamClient({
                 gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
                 tenantId: "demo-tenant",
+                userId: "demo-ceo-123", // [YENİ]
                 language: "tr-TR",
                 listenOnlyMode: true,
                 onTranscript: (data) => handleUserAudio(data, client),
                 onStatusUpdate: handleMoodShift
             });
+
             await window.earClient.start();
 
             micBtn.classList.add('active');
@@ -403,7 +484,7 @@
 
         let lockedSpeakerId = null;
         let activeTurnEl = null;
-        
+
         let sentenceBuffer = "";
         let brainTriggerTimeout = null;
 
@@ -439,25 +520,25 @@
                 textEl.classList.remove('partial');
                 activeTurnEl = null;
                 lockedSpeakerId = null;
-                
+
                 sentenceBuffer += text + " ";
                 clearTimeout(brainTriggerTimeout);
-                
+
                 brainTriggerTimeout = setTimeout(() => {
                     const finalContext = sentenceBuffer.trim();
-                    sentenceBuffer = ""; 
-                    
+                    sentenceBuffer = "";
+
                     if (finalContext.split(' ').length > 2 && !finalContext.includes("[SYSTEM")) {
-                        
+
                         // [ARCH-COMPLIANCE FIX]: Master Spec v4.0 Crystalline JSON Extractor Prompt
                         const stealthPrompt = `[SYSTEM_OVERRIDE_COGNITIVE_EXTRACTOR]
 Görevin, kullanıcının konuşmasından KALICI GERÇEKLERİ (Facts) çıkarmaktır. Çıktı KESİNLİKLE aşağıdaki JSON dizisi (Array) formatında olmalıdır. Önem derecesi (importance) 1 ile 5 arasındadır (5: Asla unutulmamalı, kritik). Çıkarılacak bir bilgi yoksa boş dizi [] dön. FORMAT: [{"category": "finance", "importance": 4, "summary": "500 USD yatırım planı var", "metadata": ["bütçe", "dolar"]}]
 
 METİN: "${finalContext}"`;
-                        
+
                         brainClient.sendText(stealthPrompt);
                     }
-                }, 1500); 
+                }, 1500);
             }
             feed.scrollTop = feed.scrollHeight;
         }
@@ -469,7 +550,7 @@ METİN: "${finalContext}"`;
             const rawText = (data.text || data.text_chunk || "").trim();
 
             if (!rawText.includes('[') && !rawText.includes('NONE')) {
-                return; 
+                return;
             }
 
             llmBox.classList.add('active');
@@ -502,7 +583,7 @@ METİN: "${finalContext}"`;
                             const accentColor = importanceColors[memory.importance - 1] || "#3b82f6";
 
                             card.style.borderLeft = `4px solid ${accentColor}`;
-                            
+
                             let tagsHtml = '';
                             if (memory.metadata && Array.isArray(memory.metadata)) {
                                 tagsHtml = `<div class="card-tags">` + memory.metadata.map(t => `<span class="tag">#${t}</span>`).join('') + `</div>`;
@@ -526,13 +607,13 @@ METİN: "${finalContext}"`;
 
             }, 1500);
         }
-        
+
         function handleMoodShift(statusStr) {
             try {
                 const status = JSON.parse(statusStr);
                 if (status.type === "MOOD_SHIFT") {
                     const isAnomaly = Math.abs(status.arousal_shift) > 0.4 || status.new_mood === 'angry';
-                    if (!isAnomaly) return; 
+                    if (!isAnomaly) return;
 
                     const card = document.createElement('div');
                     card.className = 'memory-card critical';
@@ -557,4 +638,5 @@ METİN: "${finalContext}"`;
         micBtn.onclick = toggleMode;
     </script>
 </body>
+
 </html>
