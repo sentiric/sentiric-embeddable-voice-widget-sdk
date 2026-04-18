@@ -129,13 +129,28 @@ export class SentiricStreamClient {
     });
   }
 
+  // [ARCH-COMPLIANCE] SOP-01: WebSocket State Guard implementation
+  // Bağlantı açık değilse veri gönderimi sessizce iptal edilir (Panic prevention).
+
+  // [ARCH-COMPLIANCE FIX]: Resolve TS2345 SharedArrayBuffer / ArrayBufferView conflict
+  private safeSend(encodedData: Uint8Array) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      // TypeScript'in tip kontrolünü atlatmak ve güvenle binary göndermek için 'as any' kullanıyoruz.
+      // Bu, Protobuf verisinin WebSocket hattına hatasız basılmasını sağlar.
+      this.ws.send(encodedData as any);
+    } else {
+      // [SUTS v4.0]
+      Logger.debug(
+        "WS_SEND_SKIPPED",
+        "Bağlantı açık olmadığı için paket gönderilemedi.",
+      );
+    }
+  }
+
   public sendInterrupt() {
-    if (!this.isReady || !this.ws) return;
-    // EVENT_TYPE_INTERRUPT (1)
-    const req = StreamSessionRequest.create({
-      control: { event: 1 },
-    });
-    this.ws.send(StreamSessionRequest.encode(req).finish());
+    if (!this.isReady) return;
+    const req = StreamSessionRequest.create({ control: { event: 1 } });
+    this.safeSend(StreamSessionRequest.encode(req).finish());
   }
 
   public sendEos() {
@@ -148,11 +163,9 @@ export class SentiricStreamClient {
   }
 
   public sendAudio(chunk: Uint8Array) {
-    if (!this.isReady || !this.ws) return;
-    const req = StreamSessionRequest.create({
-      audioChunk: chunk,
-    });
-    this.ws.send(StreamSessionRequest.encode(req).finish());
+    if (!this.isReady) return;
+    const req = StreamSessionRequest.create({ audioChunk: chunk });
+    this.safeSend(StreamSessionRequest.encode(req).finish());
   }
 
   public sendText(text: string) {
