@@ -44,13 +44,15 @@ function generateSecureUUID(): string {
 }
 
 export class SentiricStreamClient {
-  public static readonly VERSION = __APP_VERSION__;
   private ws: WebSocket | null = null;
-  public options: StreamClientOptions;
   private isReady: boolean = false;
   private audioManager: SentiricAudioManager | null = null;
   private qaLog: any[] = [];
   private activeAiText: string = "";
+
+  public options: StreamClientOptions;
+
+  public static readonly VERSION = __APP_VERSION__; // Vite tarafından enjekte edilir
 
   public readonly traceId: string;
   public readonly sessionId: string;
