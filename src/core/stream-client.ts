@@ -44,6 +44,7 @@ function generateSecureUUID(): string {
 }
 
 export class SentiricStreamClient {
+  public static readonly VERSION = __APP_VERSION__;
   private ws: WebSocket | null = null;
   public options: StreamClientOptions;
   private isReady: boolean = false;
