@@ -210,7 +210,7 @@
             if (isRunning) {
                 client?.stop();
                 isRunning = false;
-                toggleBtn.innerText = "BAŞLAT";
+                toggleBtn.innerText = "ZİHNİ BAŞLAT";
                 toggleBtn.className = "btn";
                 statusInd.innerText = "Durduruldu";
                 statusInd.style.color = "#ef4444";
@@ -225,20 +225,35 @@
                 gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
                 tenantId: "demo-tenant",
                 language: "tr-TR",
-                listenOnlyMode: true, // [ARCH-COMPLIANCE]: Sadece dinle, konuşma.
                 
+                // [ARCH-COMPLIANCE FIX]: Zihin haritası çıkarmak için LLM'in (Cognition) çalışması şarttır.
+                // Bu yüzden listenOnlyMode KULLANMIYORUZ. Gerçek bir sohbet başlatıyoruz.
+                listenOnlyMode: false, 
+                
+                // Sisteme "Terapist/Dinleyici" kimliği veriyoruz ki bize uzun uzun cevap verip sözümüzü kesmesin.
+                systemPromptId: "PROMPT_SYSTEM_DEFAULT", // Not: Veritabanından bu prompt'u "Kısa ve destekleyici cevaplar ver" olarak ayarlayabilirsiniz.
+
                 onTranscript: (data) => {
                     const isFinal = data.isFinal || data.is_final;
                     const text = data.text || data.text_chunk || "";
                     const mood = data.emotion || "neutral";
+                    const isUser = data.sender === "USER";
 
                     if (!activePartialBubble) {
                         activePartialBubble = document.createElement('div');
                         transcriptBox.appendChild(activePartialBubble);
                     }
 
-                    activePartialBubble.className = `speech-bubble mood-${mood} ${isFinal ? '' : 'partial'}`;
-                    activePartialBubble.innerText = text;
+                    // Yapay zekanın (Sistemin) size verdiği kısa cevapları da Flow ekranında farklı bir renkle gösteriyoruz.
+                    if (isUser) {
+                        activePartialBubble.className = `speech-bubble mood-${mood} ${isFinal ? '' : 'partial'}`;
+                        activePartialBubble.innerHTML = `<strong>Siz:</strong> ${text}`;
+                    } else {
+                        activePartialBubble.className = `speech-bubble ai-response`;
+                        activePartialBubble.style.borderColor = "#8b5cf6"; // AI Rengi
+                        activePartialBubble.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                        activePartialBubble.innerHTML = `<strong>Sentiric:</strong> ${text}`;
+                    }
 
                     if (isFinal) {
                         activePartialBubble = null;
@@ -246,15 +261,19 @@
                     transcriptBox.scrollTop = transcriptBox.scrollHeight;
                 },
 
-                // İŞTE BÜYÜ BURADA: Crystalline'den gelen canlı zihin haritası!
+// [DIAGNOSTIC LOGGING] - Bu blok veriyi doğrulamamızı sağlar
                 onCognitiveMap: (data) => {
-                    // Update Radars
-                    if(data.arousalScore) barArousal.style.width = `${data.arousalScore * 100}%`;
-                    if(data.valenceScore) barValence.style.width = `${data.valenceScore * 100}%`;
-                    if(data.logicScore) barLogic.style.width = `${data.logicScore * 100}%`;
+                    console.group("%c🧠 CRYSTALLINE DATA RECEIVED", "color: #8b5cf6; font-weight: bold;");
+                    console.log("Payload:", data);
+                    console.groupEnd();
+
+                    // Radar Skorlarını Güncelle (Null Check ile)
+                    if(data.arousalScore !== undefined) barArousal.style.width = `${data.arousalScore * 100}%`;
+                    if(data.valenceScore !== undefined) barValence.style.width = `${data.valenceScore * 100}%`;
+                    if(data.logicScore !== undefined) barLogic.style.width = `${data.logicScore * 100}%`;
                     if(data.dominantResonance) dominantMood.innerText = data.dominantResonance.toUpperCase();
 
-                    // Update Traits
+                    // Karakter Özelliklerini Güncelle
                     if (data.activeTraits && data.activeTraits.length > 0) {
                         traitsBox.innerHTML = "";
                         data.activeTraits.forEach(trait => {
@@ -265,17 +284,20 @@
                         });
                     }
 
-                    // Add new Fact
+                    // Atomik Hafızayı Güncelle (Deduplication UI Side)
                     if (data.recentFactSummary) {
                         if (factsBox.innerHTML.includes("Veritabanına yazılan")) factsBox.innerHTML = "";
                         
                         const facts = data.recentFactSummary.split(" | ");
                         facts.forEach(fact => {
                             if(!fact.trim()) return;
-                            const card = document.createElement('div');
-                            card.className = 'fact-card';
-                            card.innerText = fact;
-                            factsBox.prepend(card); // En yeni en üste
+                            // Ekranın dolup taşmaması için mükerrer kontrolü
+                            if (!factsBox.innerText.includes(fact.substring(0, 20))) {
+                                const card = document.createElement('div');
+                                card.className = 'fact-card';
+                                card.innerText = fact;
+                                factsBox.prepend(card);
+                            }
                         });
                     }
                 }
@@ -285,7 +307,7 @@
             isRunning = true;
             toggleBtn.innerText = "DURDUR";
             toggleBtn.className = "btn danger";
-            statusInd.innerText = "Dinleniyor...";
+            statusInd.innerText = "Sizi Dinliyor ve Analiz Ediyor...";
             statusInd.style.color = "#3b82f6";
         }
 

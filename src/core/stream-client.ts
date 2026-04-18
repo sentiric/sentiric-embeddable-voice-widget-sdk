@@ -25,12 +25,17 @@ export interface StreamClientOptions {
   onAudioReceived?: (chunk: Uint8Array) => void;
   onTranscript?: (data: TranscriptEvent) => void;
   onStatusUpdate?: (statusStr: string) => void;
-  onCognitiveMap?: (data: any) => void; // [ARCH-COMPLIANCE: Cognitive Mirror]
+  onCognitiveMap?: (data: any) => void;
   onError?: (error: any) => void;
   onClose?: () => void;
 }
 
-function generateUUID() {
+// [ARCH-COMPLIANCE FIX]: Cryptographically Secure UUID Generation
+function generateSecureUUID(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older browsers
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0,
       v = c === "x" ? r : (r & 0x3) | 0x8;
@@ -51,12 +56,12 @@ export class SentiricStreamClient {
   public readonly userId: string;
 
   constructor(options: StreamClientOptions) {
-    this.traceId = options.traceId || generateUUID();
-    this.sessionId = options.sessionId || generateUUID();
+    this.traceId = options.traceId || generateSecureUUID();
+    this.sessionId = options.sessionId || generateSecureUUID();
 
     let storedUserId = localStorage.getItem("sentiric_demo_uid");
     if (!storedUserId) {
-      storedUserId = "usr_" + generateUUID().split("-")[0];
+      storedUserId = "usr_" + generateSecureUUID().split("-")[0];
       localStorage.setItem("sentiric_demo_uid", storedUserId);
     }
     this.userId = options.userId || storedUserId;
@@ -84,7 +89,8 @@ export class SentiricStreamClient {
 
       this.ws.onopen = () => {
         this.isReady = true;
-        const configReq = StreamSessionRequest.fromPartial({
+        // [ARCH-COMPLIANCE FIX]: ts-proto flattening rules applied (No $case, no data wrapper)
+        const configReq = StreamSessionRequest.create({
           config: {
             token: this.options.token!,
             language: this.options.language!,
@@ -95,54 +101,66 @@ export class SentiricStreamClient {
             chatOnlyMode: this.options.chatOnlyMode!,
             traceId: this.traceId,
             sessionId: this.sessionId,
-            systemPromptId: this.options.systemPromptId,
-            ttsVoiceId: this.options.ttsVoiceId,
+            systemPromptId: this.options.systemPromptId!,
+            ttsVoiceId: this.options.ttsVoiceId!,
           },
         });
         this.ws?.send(StreamSessionRequest.encode(configReq).finish());
         resolve();
       };
+
       this.ws.onmessage = (e) => this.handleMessage(e.data);
+
       this.ws.onclose = () => {
-        if (this.isReady) setTimeout(() => this.connect(), 2000);
+        Logger.warn("WS_CLOSED", "WebSocket connection closed.");
+        if (this.isReady) {
+          this.audioManager?.flushPlayback();
+          setTimeout(() => this.connect(), 2000);
+        }
+        if (this.options.onClose) this.options.onClose();
+      };
+
+      this.ws.onerror = (err) => {
+        Logger.error("WS_ERROR", "WebSocket encountered an error.", {
+          error: err,
+        });
+        if (this.options.onError) this.options.onError(err);
       };
     });
   }
 
   public sendInterrupt() {
     if (!this.isReady || !this.ws) return;
-    this.ws.send(
-      StreamSessionRequest.encode(
-        StreamSessionRequest.fromPartial({ control: { event: 1 } }),
-      ).finish(),
-    );
+    // EVENT_TYPE_INTERRUPT (1)
+    const req = StreamSessionRequest.create({
+      control: { event: 1 },
+    });
+    this.ws.send(StreamSessionRequest.encode(req).finish());
   }
 
   public sendEos() {
     if (!this.isReady || !this.ws) return;
-    this.ws.send(
-      StreamSessionRequest.encode(
-        StreamSessionRequest.fromPartial({ control: { event: 2 } }),
-      ).finish(),
-    );
+    // EVENT_TYPE_EOS (2)
+    const req = StreamSessionRequest.create({
+      control: { event: 2 },
+    });
+    this.ws.send(StreamSessionRequest.encode(req).finish());
   }
 
   public sendAudio(chunk: Uint8Array) {
     if (!this.isReady || !this.ws) return;
-    this.ws.send(
-      StreamSessionRequest.encode(
-        StreamSessionRequest.fromPartial({ audioChunk: chunk }),
-      ).finish(),
-    );
+    const req = StreamSessionRequest.create({
+      audioChunk: chunk,
+    });
+    this.ws.send(StreamSessionRequest.encode(req).finish());
   }
 
   public sendText(text: string) {
     if (!this.isReady || !this.ws) return;
-    this.ws.send(
-      StreamSessionRequest.encode(
-        StreamSessionRequest.fromPartial({ textMessage: text }),
-      ).finish(),
-    );
+    const req = StreamSessionRequest.create({
+      textMessage: text,
+    });
+    this.ws.send(StreamSessionRequest.encode(req).finish());
     this.sendEos();
   }
 
@@ -150,7 +168,7 @@ export class SentiricStreamClient {
     try {
       const message = StreamSessionResponse.decode(new Uint8Array(data));
 
-      // [ARCH-COMPLIANCE FIX]: TS-Proto flat oneof type narrowing
+      // [ARCH-COMPLIANCE FIX]: ts-proto flattened properties evaluation
       if (message.audioResponse && message.audioResponse.length > 0) {
         this.handleAudioResponse(message.audioResponse);
       } else if (message.transcript) {
@@ -160,8 +178,9 @@ export class SentiricStreamClient {
       } else if (message.clearAudioBuffer) {
         this.audioManager?.flushPlayback();
       } else if (message.statusUpdate) {
-        if (this.options.onStatusUpdate)
+        if (this.options.onStatusUpdate) {
           this.options.onStatusUpdate(message.statusUpdate);
+        }
       }
     } catch (e) {
       Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });
@@ -175,8 +194,8 @@ export class SentiricStreamClient {
   }
 
   private handleTranscript(t: TranscriptEvent) {
-    const isFinal = t.isFinal || (t as any).is_final;
-    const text = t.text || (t as any).text_chunk || "";
+    const isFinal = t.isFinal;
+    const text = t.text;
 
     if (t.sender === "USER") {
       this.audioManager?.setElasticMode(!isFinal);

@@ -1,7 +1,8 @@
-// [ARCH-COMPLIANCE FIX]: src/ui/voice-widget.ts - Linter ve Null Check Fixleri
+// File: src/ui/voice-widget.ts
 import { SentiricStreamClient } from "../core/stream-client";
 import htmlTemplate from "./voice-widget.html?raw";
 import cssTemplate from "./voice-widget.css?inline";
+import { TranscriptEvent } from "@sentiric/contracts/stream";
 
 export class SentiricVoiceWidget extends HTMLElement {
   private client: SentiricStreamClient | null = null;
@@ -145,12 +146,13 @@ export class SentiricVoiceWidget extends HTMLElement {
     return this.speakerMap[speakerId];
   }
 
-  private handleTranscript(data: any) {
+  // [ARCH-COMPLIANCE FIX]: Strict Typing for TranscriptEvent
+  private handleTranscript(data: TranscriptEvent) {
     if (!this.activeTextEl || !this.activeSpeakerEl) return;
 
     const isUser = data.sender === "USER";
-    const isFinal = data.isFinal || data.is_final;
-    const rawSpeakerId = data.speakerId || data.speaker_id || "?";
+    const isFinal = data.isFinal;
+    const rawSpeakerId = data.speakerId || "?";
 
     if (!this.lockedSpeakerId) {
       this.lockedSpeakerId = rawSpeakerId;
@@ -164,7 +166,7 @@ export class SentiricVoiceWidget extends HTMLElement {
       ? spkInfo.color
       : "var(--theme-color)";
 
-    this.activeTextEl.innerText = data.text || data.text_chunk || "...";
+    this.activeTextEl.innerText = data.text || "...";
 
     if (isUser) {
       this.activeTextEl.className = isFinal
@@ -177,7 +179,7 @@ export class SentiricVoiceWidget extends HTMLElement {
     }
 
     if (this.devModeActive && this.metricsDataEl) {
-      const v = data.speaker_vec || [];
+      const v = data.speakerVec || [];
       this.metricsDataEl.innerHTML = `
          <b>Mode:</b> ${isUser ? "Listening" : "Synthesizing"}<br>
          <b>Spk ID:</b> ${this.lockedSpeakerId} (Raw: ${rawSpeakerId})<br>
@@ -233,7 +235,7 @@ export class SentiricVoiceWidget extends HTMLElement {
         }, 5000);
       }
     } catch {
-      // JSON parse hatasını yoksay
+      // Ignore JSON parse errors
     }
   }
 
