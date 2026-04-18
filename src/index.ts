@@ -1,10 +1,9 @@
-/**
- * Sentiric Embeddable Voice Widget SDK
- * Entry Point
- */
-
-import "./ui/voice-widget"; // Widget'ı otomatik kaydeder
-export { SentiricStreamClient } from "./core/stream-client";
+import "./ui/voice-widget";
+import { SentiricStreamClient } from "./core/stream-client";
+export { SentiricStreamClient };
 export type { StreamClientOptions } from "./core/stream-client";
 
-console.log("🌊 Sentiric Voice SDK Initialized");
+// [ARCH-COMPLIANCE] Global Fallback: Modül sistemi bozulsa bile window üzerinden kurtar
+if (typeof window !== "undefined") {
+  (window as any).SentiricStreamClient = SentiricStreamClient;
+}
