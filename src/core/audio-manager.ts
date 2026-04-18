@@ -50,6 +50,18 @@ export class SentiricAudioManager {
     }
   }
 
+  // [ARCH-COMPLIANCE] SOP-01: Decouple Playback Context from Microphone
+  // Hoparlör motoru, mikrofon izni olmasa bile (Megaphone modu) çalışabilmelidir.
+
+  public async ensureContext(): Promise<void> {
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
+    }
+    if (this.audioContext.state === "suspended") {
+      await this.audioContext.resume();
+    }
+  }
+
   public async startMicrophone(): Promise<void> {
     try {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -60,22 +72,19 @@ export class SentiricAudioManager {
         },
       });
 
-      if (!this.audioContext)
-        this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
-      if (this.audioContext.state === "suspended")
-        await this.audioContext.resume();
+      await this.ensureContext(); // AudioContext'in varlığını garanti et
 
       const blob = new Blob([AUDIO_WORKLET_CODE], {
         type: "application/javascript",
       });
       const url = URL.createObjectURL(blob);
-      await this.audioContext.audioWorklet.addModule(url);
+      await this.audioContext!.audioWorklet.addModule(url);
 
-      this.sourceNode = this.audioContext.createMediaStreamSource(
+      this.sourceNode = this.audioContext!.createMediaStreamSource(
         this.mediaStream,
       );
       this.workletNode = new AudioWorkletNode(
-        this.audioContext,
+        this.audioContext!,
         "sentiric-audio-processor",
       );
 

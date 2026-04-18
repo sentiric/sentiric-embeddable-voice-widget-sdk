@@ -248,6 +248,8 @@ export class SentiricStreamClient {
     Logger.info("SESSION_STOPPED", "User ended session.");
   }
 
+  // [ARCH-COMPLIANCE] SOP-01: Fix Speaker Initialization in Speak-Only Mode
+
   public async start(): Promise<void> {
     this.audioManager = new SentiricAudioManager(
       (c) => this.sendAudio(c),
@@ -255,11 +257,19 @@ export class SentiricStreamClient {
       () => this.sendEos(),
       this.options.sampleRate,
     );
+
     await this.connect();
 
+    // KRİTİK FİX: Her durumda hoparlör motorunu hazırla
+    if (this.audioManager) {
+      await this.audioManager.ensureContext();
+    }
+
     if (!this.options.chatOnlyMode && !this.options.speakOnlyMode) {
+      // Sadece chat ve megaphone değilse mikrofonu aç
       await this.audioManager.startMicrophone();
     }
+
     Logger.info("SESSION_ACTIVE", "AI Session started successfully.");
   }
 }
