@@ -10,7 +10,7 @@ import { Logger } from "../utils/logger";
 export interface StreamClientOptions {
   gatewayUrl: string;
   tenantId: string;
-  userId?: string; // [YENİ]: Kullanıcıyı sekmeler arası hatırlamak için
+  userId?: string;
   traceId?: string;
   sessionId?: string;
   token?: string;
@@ -25,6 +25,7 @@ export interface StreamClientOptions {
   onAudioReceived?: (chunk: Uint8Array) => void;
   onTranscript?: (data: TranscriptEvent) => void;
   onStatusUpdate?: (statusStr: string) => void;
+  onCognitiveMap?: (data: any) => void; // [ARCH-COMPLIANCE: Cognitive Mirror]
   onError?: (error: any) => void;
   onClose?: () => void;
 }
@@ -39,7 +40,7 @@ function generateUUID() {
 
 export class SentiricStreamClient {
   private ws: WebSocket | null = null;
-  public options: StreamClientOptions; // public yapıldı
+  public options: StreamClientOptions;
   private isReady: boolean = false;
   private audioManager: SentiricAudioManager | null = null;
   private qaLog: any[] = [];
@@ -53,8 +54,6 @@ export class SentiricStreamClient {
     this.traceId = options.traceId || generateUUID();
     this.sessionId = options.sessionId || generateUUID();
 
-    // [ARCH-COMPLIANCE FIX]: Eğer userId verilmemişse, LocalStorage'dan persistent bir ID al.
-    // Bu sayede demo ortamında sekmeler arası "Bilişsel Hafıza" kopmaz.
     let storedUserId = localStorage.getItem("sentiric_demo_uid");
     if (!storedUserId) {
       storedUserId = "usr_" + generateUUID().split("-")[0];
@@ -79,7 +78,6 @@ export class SentiricStreamClient {
 
   private async connect(): Promise<void> {
     return new Promise((resolve) => {
-      // trace_id'yi gateway'e URL üzerinden iletiyoruz
       const urlWithTrace = `${this.options.gatewayUrl}?trace_id=${this.traceId}`;
       this.ws = new WebSocket(urlWithTrace);
       this.ws.binaryType = "arraybuffer";
@@ -97,7 +95,6 @@ export class SentiricStreamClient {
             chatOnlyMode: this.options.chatOnlyMode!,
             traceId: this.traceId,
             sessionId: this.sessionId,
-            // userId: this.userId, <--- BU SATIRI SİLDİK
             systemPromptId: this.options.systemPromptId,
             ttsVoiceId: this.options.ttsVoiceId,
           },
@@ -153,68 +150,66 @@ export class SentiricStreamClient {
     try {
       const message = StreamSessionResponse.decode(new Uint8Array(data));
 
+      // [ARCH-COMPLIANCE FIX]: TS-Proto flat oneof type narrowing
       if (message.audioResponse && message.audioResponse.length > 0) {
-        this.audioManager?.setAiSpeaking(true);
-        this.audioManager?.playChunk(message.audioResponse);
-        if (this.options.onAudioReceived)
-          this.options.onAudioReceived(message.audioResponse);
+        this.handleAudioResponse(message.audioResponse);
       } else if (message.transcript) {
-        const t = message.transcript;
-        const isFinal = t.isFinal || (t as any).is_final;
-        const text = t.text || (t as any).text_chunk || "";
-        const sender = t.sender;
-
-        if (sender === "USER") {
-          this.audioManager?.setElasticMode(!isFinal);
-          if (isFinal) {
-            this.qaLog.push({
-              timestamp: new Date().toISOString(),
-              speaker: "USER",
-              speaker_id: t.speakerId || "?",
-              emotion: t.emotion || "neutral",
-              text,
-            });
-          }
-        } else if (sender === "AI") {
-          this.activeAiText = text;
-          if (isFinal) {
-            this.audioManager?.setAiSpeaking(false);
-            this.qaLog.push({
-              timestamp: new Date().toISOString(),
-              speaker: "AI",
-              text: this.activeAiText,
-            });
-            this.activeAiText = "";
-          }
-        }
-        try {
-          if (this.options.onTranscript) this.options.onTranscript(t);
-        } catch {}
+        this.handleTranscript(message.transcript);
+      } else if (message.cognitiveMap) {
+        this.handleCognitiveMap(message.cognitiveMap);
       } else if (message.clearAudioBuffer) {
         this.audioManager?.flushPlayback();
       } else if (message.statusUpdate) {
-        try {
-          if (this.options.onStatusUpdate)
-            this.options.onStatusUpdate(message.statusUpdate);
-        } catch {}
+        if (this.options.onStatusUpdate)
+          this.options.onStatusUpdate(message.statusUpdate);
       }
     } catch (e) {
       Logger.error("WS_DECODE_ERROR", "Protobuf decode failed.", { error: e });
     }
   }
 
+  private handleAudioResponse(audioData: Uint8Array) {
+    this.audioManager?.setAiSpeaking(true);
+    this.audioManager?.playChunk(audioData);
+    if (this.options.onAudioReceived) this.options.onAudioReceived(audioData);
+  }
+
+  private handleTranscript(t: TranscriptEvent) {
+    const isFinal = t.isFinal || (t as any).is_final;
+    const text = t.text || (t as any).text_chunk || "";
+
+    if (t.sender === "USER") {
+      this.audioManager?.setElasticMode(!isFinal);
+      if (isFinal) {
+        this.qaLog.push({
+          timestamp: new Date().toISOString(),
+          speaker: "USER",
+          text,
+        });
+      }
+    } else if (t.sender === "AI") {
+      this.activeAiText = text;
+      if (isFinal) {
+        this.audioManager?.setAiSpeaking(false);
+        this.qaLog.push({
+          timestamp: new Date().toISOString(),
+          speaker: "AI",
+          text: this.activeAiText,
+        });
+        this.activeAiText = "";
+      }
+    }
+    if (this.options.onTranscript) this.options.onTranscript(t);
+  }
+
+  private handleCognitiveMap(mapData: any) {
+    if (this.options.onCognitiveMap) this.options.onCognitiveMap(mapData);
+  }
+
   public stop() {
     this.isReady = false;
     this.ws?.close();
     this.audioManager?.stop();
-    if (this.activeAiText.trim().length > 0) {
-      this.qaLog.push({
-        timestamp: new Date().toISOString(),
-        speaker: "AI",
-        text: this.activeAiText,
-      });
-      this.activeAiText = "";
-    }
     Logger.info("SESSION_STOPPED", "User ended session.");
   }
 
@@ -227,12 +222,9 @@ export class SentiricStreamClient {
     );
     await this.connect();
 
-    // [ARCH-COMPLIANCE FIX]: listenOnlyMode mikrofonu AÇMAK ZORUNDADIR!
-    // Sadece chatOnlyMode veya speakOnlyMode açıksa mikrofon kapalı kalır.
     if (!this.options.chatOnlyMode && !this.options.speakOnlyMode) {
       await this.audioManager.startMicrophone();
     }
-
     Logger.info("SESSION_ACTIVE", "AI Session started successfully.");
   }
 }
