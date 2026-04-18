@@ -13,20 +13,17 @@ export default defineConfig({
     },
   },
   build: {
-    // Library mode multiple entry points ile çakıştığı için 
-    // lib tanımını kaldırıp rollupOptions ile yönetiyoruz
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        interactive: resolve(__dirname, 'demos/interactive-agent.html'),
-        analyst: resolve(__dirname, 'demos/meeting-analyst.html'),
-        megaphone: resolve(__dirname, 'demos/megaphone.html'),
-        omnichat: resolve(__dirname, 'demos/omni-chat.html'),
-        cognitive: resolve(__dirname, 'demos/cognitive-canvas.html'), // [YENİ]
+        interactive: resolve(__dirname, 'examples/interactive-agent.html'),
+        analyst: resolve(__dirname, 'examples/meeting-analyst.html'),
+        megaphone: resolve(__dirname, 'examples/megaphone.html'),
+        omnichat: resolve(__dirname, 'examples/omni-chat.html'),
+        cognitive: resolve(__dirname, 'examples/cognitive-canvas.html'),
         sdk: resolve(__dirname, 'src/index.ts')
       },
       output: {
-        // SDK'yı hala bir kütüphane olarak kullanmak isteyenler için format ayarı
         entryFileNames: (chunkInfo) => {
            return chunkInfo.name === 'sdk' ? 'stream-sdk.js' : '[name].js';
         },
@@ -34,5 +31,11 @@ export default defineConfig({
       }
     },
     minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Üretim ortamında console.log'ları temizler
+        drop_debugger: true
+      }
+    }
   }
 });

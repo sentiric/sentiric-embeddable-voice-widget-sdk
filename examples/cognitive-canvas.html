@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognitive Canvas | Sentiric OS</title>
+    <!-- [ARCH-COMPLIANCE FIX]: Inline devasa CSS silindi, modüler bir yapıya veya asgari CSS'e indirildi. -->
+    <style>
+        body { margin: 0; font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; overflow: hidden; }
+        .pane { flex: 1; display: flex; flex-direction: column; padding: 2rem; overflow-y: auto; }
+        .pane-left { border-right: 1px solid #334155; }
+        .pane-right { background: #020617; }
+        h2 { font-size: 1.2rem; color: #94a3b8; border-bottom: 1px solid #334155; padding-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px; }
+        .speech-bubble { background: #1e293b; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid #3b82f6; margin-bottom: 1rem; line-height: 1.5; }
+        .ai-response { border-color: #8b5cf6; background: rgba(139, 92, 246, 0.1); }
+        .stat-card { background: #1e293b; padding: 1.5rem; border-radius: 1rem; margin-bottom: 1rem; border: 1px solid #334155; }
+        .trait-badge { display: inline-block; padding: 0.2rem 0.8rem; background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid #8b5cf6; border-radius: 2rem; font-size: 0.8rem; margin: 0.2rem; }
+        .fact-card { background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8; padding: 1rem; border-radius: 0.5rem; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        .action-bar { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); padding: 1rem 2rem; border-radius: 2rem; border: 1px solid #334155; display: flex; gap: 1rem; align-items: center; }
+        .btn { background: #4f46e5; color: white; border: none; padding: 0.75rem 2rem; border-radius: 2rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn.danger { background: #ef4444; }
+        .back-link { position: absolute; top: 1rem; left: 1rem; color: #38bdf8; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+
+<body>
+    <a href="../index.html" class="back-link">&larr; Vitrine Dön</a>
+
+    <div class="pane pane-left">
+        <h2>🎙️ The Flow (Bilinç Akışı)</h2>
+        <div id="transcriptBox" style="flex-grow: 1; overflow-y: auto; margin-top: 1rem; padding-right: 1rem;"></div>
+    </div>
+
+    <div class="pane pane-right">
+        <h2>🧠 The Mind (Bilişsel Ayna)</h2>
+        <div class="stat-card">
+            <div style="font-size:0.8rem; color:#64748b; margin-bottom:0.5rem;">DOMINANT DUYGU</div>
+            <strong id="dominantMood" style="color:#c4b5fd; font-size: 1.2rem;">Neutral</strong>
+        </div>
+        <div class="stat-card">
+            <div style="font-size:0.8rem; color:#64748b; margin-bottom:0.5rem;">KARAKTER ÖZELLİKLERİ</div>
+            <div id="traitsBox"><span style="color:#475569;">Bekleniyor...</span></div>
+        </div>
+        <div class="stat-card" style="flex-grow: 1; border-color:#0284c7; background: rgba(2,132,199,0.05);">
+            <div style="font-size:0.8rem; color:#38bdf8; margin-bottom:0.5rem;">ÖĞRENİLEN GERÇEKLER (Hafıza)</div>
+            <div id="factsBox"><span style="color:#475569;">Veritabanına yazılan anılar burada belirecek...</span></div>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <span id="statusIndicator" style="color:#10b981; font-weight:bold;">Hazır</span>
+        <button class="btn" id="toggleBtn">BAŞLAT</button>
+    </div>
+
+    <!-- [ARCH-COMPLIANCE FIX]: Modüler ve temiz JavaScript -->
+    <script type="module">
+        import { SentiricStreamClient } from '/src/index.ts';
+
+        let client = null;
+        let isRunning = false;
+        let activePartialBubble = null;
+
+        const transcriptBox = document.getElementById('transcriptBox');
+        const traitsBox = document.getElementById('traitsBox');
+        const factsBox = document.getElementById('factsBox');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const statusInd = document.getElementById('statusIndicator');
+        const dominantMood = document.getElementById('dominantMood');
+
+        async function toggleSession() {
+            if (isRunning) {
+                client?.stop();
+                isRunning = false;
+                toggleBtn.innerText = "BAŞLAT";
+                toggleBtn.className = "btn";
+                statusInd.innerText = "Durduruldu";
+                statusInd.style.color = "#ef4444";
+                return;
+            }
+
+            transcriptBox.innerHTML = "";
+            factsBox.innerHTML = "";
+            traitsBox.innerHTML = "";
+
+            client = new SentiricStreamClient({
+                gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18030/ws",
+                tenantId: "demo-tenant",
+                language: "tr-TR",
+                listenOnlyMode: false, 
+                systemPromptId: "PROMPT_SYSTEM_DEFAULT", 
+
+                onTranscript: (data) => {
+                    const isFinal = data.isFinal;
+                    const text = data.text;
+                    const isUser = data.sender === "USER";
+
+                    if (!activePartialBubble) {
+                        activePartialBubble = document.createElement('div');
+                        transcriptBox.appendChild(activePartialBubble);
+                    }
+
+                    if (isUser) {
+                        activePartialBubble.className = `speech-bubble ${isFinal ? '' : 'partial'}`;
+                        activePartialBubble.innerHTML = `<strong>Siz:</strong> ${text}`;
+                    } else {
+                        activePartialBubble.className = `speech-bubble ai-response`;
+                        activePartialBubble.innerHTML = `<strong>Sentiric:</strong> ${text}`;
+                    }
+
+                    if (isFinal) activePartialBubble = null;
+                    transcriptBox.scrollTop = transcriptBox.scrollHeight;
+                },
+
+                onCognitiveMap: (data) => {
+                    console.log("🧠 Crystalline Payload:", data);
+                    
+                    if (data.dominantResonance) dominantMood.innerText = data.dominantResonance.toUpperCase();
+
+                    if (data.activeTraits && data.activeTraits.length > 0) {
+                        traitsBox.innerHTML = "";
+                        data.activeTraits.forEach(trait => {
+                            const badge = document.createElement('span');
+                            badge.className = 'trait-badge';
+                            badge.innerText = trait;
+                            traitsBox.appendChild(badge);
+                        });
+                    }
+
+                    if (data.recentFactSummary) {
+                        if (factsBox.innerHTML.includes("Veritabanına yazılan")) factsBox.innerHTML = "";
+                        const facts = data.recentFactSummary.split(" | ");
+                        facts.forEach(fact => {
+                            if (!fact.trim()) return;
+                            if (!factsBox.innerText.includes(fact.substring(0, 20))) {
+                                const card = document.createElement('div');
+                                card.className = 'fact-card';
+                                card.innerText = fact;
+                                factsBox.prepend(card);
+                            }
+                        });
+                    }
+                }
+            });
+
+            await client.start();
+            isRunning = true;
+            toggleBtn.innerText = "DURDUR";
+            toggleBtn.className = "btn danger";
+            statusInd.innerText = "Dinleniyor...";
+            statusInd.style.color = "#3b82f6";
+        }
+
+        toggleBtn.onclick = toggleSession;
+    </script>
+</body>
+</html>
