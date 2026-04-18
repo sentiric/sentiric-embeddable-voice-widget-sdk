@@ -68,8 +68,8 @@ export class SentiricVoiceWidget extends HTMLElement {
     const btn = this.shadow.querySelector("#actionBtn");
     btn?.addEventListener("click", () => this.toggleConversation());
 
-    btn?.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
+    btn?.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
       this.devModeActive = !this.devModeActive;
       this.shadow
         .querySelector(".metrics-box")
@@ -85,9 +85,12 @@ export class SentiricVoiceWidget extends HTMLElement {
   private async start() {
     const gatewayUrl = this.getAttribute("gateway-url") || "";
     const tenantId = this.getAttribute("tenant-id") || "";
-    if (!gatewayUrl || !tenantId) return;
+    if (!gatewayUrl || !tenantId) {
+      this.setError("HATA: URL veya Tenant ID eksik.");
+      return;
+    }
 
-    if (this.activeTextEl) this.activeTextEl.innerText = "Bağlanıyor...";
+    this.setStatus("Bağlanıyor...", "var(--theme-color)");
 
     this.client = new SentiricStreamClient({
       gatewayUrl,
@@ -95,7 +98,7 @@ export class SentiricVoiceWidget extends HTMLElement {
       language: this.getAttribute("language") || "tr-TR",
       listenOnlyMode: this.isListenOnly,
       onClose: () => this.stop(),
-      onError: () => this.stop(),
+      onError: () => this.setError("Bağlantı hatası oluştu."),
       onTranscript: (data) => this.handleTranscript(data),
       onStatusUpdate: (statusStr) => this.handleStatusUpdate(statusStr),
     });
@@ -105,10 +108,29 @@ export class SentiricVoiceWidget extends HTMLElement {
 
     try {
       await this.client.start();
-      if (this.activeTextEl) this.activeTextEl.innerText = "Sizi dinliyor...";
+      this.setStatus("Sizi Dinliyor", "#10b981");
     } catch {
-      if (this.activeTextEl) this.activeTextEl.innerText = "Bağlantı hatası.";
+      this.setError("Mikrofon erişimi reddedildi.");
       this.stop();
+    }
+  }
+
+  private setStatus(text: string, color: string) {
+    if (this.activeTextEl) this.activeTextEl.innerText = text;
+    if (this.activeSpeakerEl) {
+      this.activeSpeakerEl.innerText = "SİSTEM";
+      this.activeSpeakerEl.style.color = color;
+    }
+  }
+
+  private setError(msg: string) {
+    if (this.activeTextEl) {
+      this.activeTextEl.innerText = msg;
+      this.activeTextEl.className = "subtitle-text partial";
+    }
+    if (this.activeSpeakerEl) {
+      this.activeSpeakerEl.innerText = "HATA";
+      this.activeSpeakerEl.style.color = "#ef4444";
     }
   }
 
@@ -146,7 +168,6 @@ export class SentiricVoiceWidget extends HTMLElement {
     return this.speakerMap[speakerId];
   }
 
-  // [ARCH-COMPLIANCE FIX]: Strict Typing for TranscriptEvent
   private handleTranscript(data: TranscriptEvent) {
     if (!this.activeTextEl || !this.activeSpeakerEl) return;
 
@@ -182,32 +203,20 @@ export class SentiricVoiceWidget extends HTMLElement {
       const v = data.speakerVec || [];
       this.metricsDataEl.innerHTML = `
          <b>Mode:</b> ${isUser ? "Listening" : "Synthesizing"}<br>
-         <b>Spk ID:</b> ${this.lockedSpeakerId} (Raw: ${rawSpeakerId})<br>
+         <b>Spk ID:</b> ${this.lockedSpeakerId}<br>
          <b>Emotion:</b> ${data.emotion || "neutral"} <br>
          <b>Arousal:</b> ${data.arousal?.toFixed(2)}<br>
          <b>Valence:</b> ${data.valence?.toFixed(2)}<br>
-         <b>Vec[0]:</b> ${v[0]?.toFixed(2)}<br>
-         <b>Vec[1]:</b> ${v[1]?.toFixed(2)}
+         <b>Vec[0]:</b> ${v[0]?.toFixed(2)}
       `;
     }
 
     if (isFinal) {
       this.lockedSpeakerId = null;
-
       if (!isUser) {
-        const currentText = this.activeTextEl.innerText;
         setTimeout(() => {
-          if (
-            !this.lockedSpeakerId &&
-            this.activeTextEl?.innerText === currentText
-          ) {
-            this.activeTextEl.innerText = "Sizi dinliyor...";
-            this.activeTextEl.className = "subtitle-text partial";
-            if (this.activeSpeakerEl) {
-              this.activeSpeakerEl.innerText = "SİSTEM";
-              this.activeSpeakerEl.style.color = "var(--theme-color)";
-            }
-          }
+          if (!this.isActive) return;
+          this.setStatus("Sizi Dinliyor", "#10b981");
         }, 2000);
       }
     }
@@ -223,19 +232,13 @@ export class SentiricVoiceWidget extends HTMLElement {
         else if (status.new_mood === "sad") glowColor = "#3b82f6";
 
         this.liquidBar.style.setProperty("--glow-color", glowColor);
-
-        if (this.activeTextEl) {
-          this.activeTextEl.innerText = `[Bilişsel Anomali: ${status.new_mood.toUpperCase()}]`;
-          this.activeTextEl.className = "subtitle-text partial";
-        }
-
         setTimeout(() => {
           if (this.liquidBar)
             this.liquidBar.style.setProperty("--glow-color", "transparent");
         }, 5000);
       }
     } catch {
-      // Ignore JSON parse errors
+      // Ignore
     }
   }
 
@@ -243,7 +246,6 @@ export class SentiricVoiceWidget extends HTMLElement {
     const btn = this.shadow.querySelector("#actionBtn") as HTMLElement;
     if (btn) {
       btn.classList.toggle("active", this.isActive);
-
       if (this.isActive && this.isListenOnly) {
         btn.innerHTML = "<span>👁️</span>";
       } else {
