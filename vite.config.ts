@@ -4,8 +4,8 @@ import { resolve } from 'path';
 import pkg from './package.json';
 
 export default defineConfig({
+  base: './',
   define: {
-    // Versiyon bilgisini kütüphane içine gömüyoruz
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   resolve: {
@@ -14,28 +14,25 @@ export default defineConfig({
     },
   },
   build: {
-    // [ARCH-COMPLIANCE]: Library Mode aktif edildi. 
-    // Artık HTML sayfaları değil, sadece kütüphane dosyası üretilir.
-    lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
-      name: 'SentiricStreamSDK',
-      // Çıktı formatları: ES Module ve UMD (Universal)
-      fileName: (format) => `stream-sdk.${format}.js`,
-      formats: ['es', 'umd']
-    },
     rollupOptions: {
-      // Kütüphane içine gömülmeyecek dış bağımlılıklar
-      external: [], 
+      input: {
+        // [ARCH-COMPLIANCE]: Sadece Statik Giriş ve SDK Çekirdeği bırakıldı.
+        // index.html burada 'main' olarak kaldığı için dist/ klasörüne kopyalanacak,
+        // böylece GitHub Pages 404 hatası vermeyecektir.
+        main: resolve(__dirname, 'index.html'),
+        sdk: resolve(__dirname, 'src/index.ts')
+      },
       output: {
-        globals: {
-          // Eğer dış bağımlılık olsaydı burada eşlenirdi
-        }
+        entryFileNames: (chunkInfo) => {
+           return chunkInfo.name === 'sdk' ? 'stream-sdk.js' : '[name].js';
+        },
+        format: 'es'
       }
     },
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true,
+        drop_console: true, // Üretim loglarını temizler
         drop_debugger: true
       }
     }

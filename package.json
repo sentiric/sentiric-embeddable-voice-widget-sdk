@@ -1,18 +1,16 @@
 {
   "name": "@sentiric/stream-sdk",
-  "version": "0.8.4",
+  "version": "0.8.7",
   "description": "Universal Sentiric Stream SDK. High-performance communication engine for Voice, Chat and AI interactions.",
   "engines": {
     "node": ">=20"
   },
   "type": "module",
-  "main": "./dist/stream-sdk.umd.cjs",
-  "module": "./dist/stream-sdk.js",
+  "main": "./dist/stream-sdk.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/stream-sdk.js",
-      "require": "./dist/stream-sdk.umd.cjs"
+      "import": "./dist/stream-sdk.js"
     }
   },
   "scripts": {
